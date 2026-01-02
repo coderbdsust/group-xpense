@@ -5,6 +5,7 @@ import '../models/expense.dart';
 import '../models/group.dart';
 import '../providers/expense_provider.dart';
 import 'add_expense_screen.dart';
+import '../widgets/currency_text.dart';
 
 class ExpenseDetailScreen extends StatelessWidget {
   final Expense expense;
@@ -28,10 +29,8 @@ class ExpenseDetailScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => AddExpenseScreen(
-                    group: group,
-                    expense: expense,
-                  ),
+                  builder: (context) =>
+                      AddExpenseScreen(group: group, expense: expense),
                 ),
               );
             },
@@ -54,15 +53,11 @@ class ExpenseDetailScreen extends StatelessWidget {
                 children: [
                   const Text(
                     'Total Amount',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.teal,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.teal),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    NumberFormat.currency(symbol: '\$', decimalDigits: 2)
-                        .format(expense.amount),
+                  CurrencyText(
+                    amount: expense.amount,
                     style: const TextStyle(
                       fontSize: 40,
                       fontWeight: FontWeight.bold,
@@ -147,9 +142,8 @@ class ExpenseDetailScreen extends StatelessWidget {
                         ),
                       ),
                       title: Text(person.name),
-                      trailing: Text(
-                        NumberFormat.currency(symbol: '\$', decimalDigits: 2)
-                            .format(split),
+                      trailing: CurrencyText(
+                        amount: split,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.teal,
@@ -181,8 +175,10 @@ class ExpenseDetailScreen extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              await Provider.of<ExpenseProvider>(context, listen: false)
-                  .deleteExpense(expense.id, group.id);
+              await Provider.of<ExpenseProvider>(
+                context,
+                listen: false,
+              ).deleteExpense(expense.id, group.id);
               if (context.mounted) {
                 Navigator.pop(context); // Close dialog
                 Navigator.pop(context); // Close detail screen
@@ -225,10 +221,7 @@ class _DetailRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
               const SizedBox(height: 4),
               Text(

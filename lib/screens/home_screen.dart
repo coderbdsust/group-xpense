@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
 import '../models/group.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
 import 'edit_group_screen.dart';
+import 'settings_screen.dart';
+import '../widgets/currency_text.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -14,22 +15,28 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Expenser'),
+        title: const Text('Group Xpense'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () {
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('About',
-                    style: TextStyle(
-                      color: Colors.teal
-                  ),),
+                  title: const Text('About'),
                   content: const Text(
-                    'Expenser\n\n'
-                        'Split expenses with friends and groups easily.\n'
-                        'Track who owes what and settle up!',
+                    'Group Xpense\n\n'
+                    'Split expenses with friends and groups easily.\n'
+                    'Track who owes what and settle up!',
                   ),
                   actions: [
                     TextButton(
@@ -184,7 +191,10 @@ class _GroupCard extends StatelessWidget {
                           children: [
                             Icon(Icons.delete, color: Colors.red, size: 20),
                             SizedBox(width: 12),
-                            Text('Delete Group', style: TextStyle(color: Colors.red)),
+                            Text(
+                              'Delete Group',
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ],
                         ),
                       ),
@@ -228,10 +238,8 @@ class _GroupCard extends StatelessWidget {
                         child: _InfoCard(
                           icon: Icons.attach_money,
                           label: 'Total',
-                          value: NumberFormat.currency(
-                            symbol: '\$',
-                            decimalDigits: 0,
-                          ).format(totalExpenses),
+                          value: '',
+                          amount: totalExpenses,
                         ),
                       ),
                     ],
@@ -285,7 +293,10 @@ class _GroupCard extends StatelessWidget {
                   backgroundColor: Color(0xFFFFEBEE),
                   child: Icon(Icons.delete, color: Colors.red),
                 ),
-                title: const Text('Delete Group', style: TextStyle(color: Colors.red)),
+                title: const Text(
+                  'Delete Group',
+                  style: TextStyle(color: Colors.red),
+                ),
                 subtitle: const Text('Remove group and all expenses'),
                 onTap: () {
                   Navigator.pop(context);
@@ -302,9 +313,7 @@ class _GroupCard extends StatelessWidget {
   void _editGroup(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EditGroupScreen(group: group),
-      ),
+      MaterialPageRoute(builder: (context) => EditGroupScreen(group: group)),
     );
   }
 
@@ -312,9 +321,7 @@ class _GroupCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Group', style: TextStyle(
-          color: Colors.teal
-        ),),
+        title: const Text('Delete Group'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,15 +337,16 @@ class _GroupCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
+                  Icon(
+                    Icons.warning_amber,
+                    color: Colors.orange[700],
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'All expenses will be permanently deleted',
-                      style: TextStyle(
-                        color: Colors.orange[900],
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: Colors.orange[900], fontSize: 13),
                     ),
                   ),
                 ],
@@ -354,8 +362,10 @@ class _GroupCard extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              await Provider.of<ExpenseProvider>(context, listen: false)
-                  .deleteGroup(group.id);
+              await Provider.of<ExpenseProvider>(
+                context,
+                listen: false,
+              ).deleteGroup(group.id);
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -384,11 +394,13 @@ class _InfoCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final double? amount;
 
   const _InfoCard({
     required this.icon,
     required this.label,
     required this.value,
+    this.amount,
   });
 
   @override
@@ -403,14 +415,25 @@ class _InfoCard extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.teal, size: 24),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.teal,
+          if (amount != null)
+            CurrencyText(
+              amount: amount!,
+              decimalDigits: 0,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+            )
+          else
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
             ),
-          ),
           Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
         ],
       ),

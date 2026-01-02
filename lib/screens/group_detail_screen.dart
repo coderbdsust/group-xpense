@@ -5,9 +5,10 @@ import '../providers/expense_provider.dart';
 import '../models/group.dart';
 import '../models/expense.dart';
 import 'add_expense_screen.dart';
-import 'edit_group_screen.dart';
 import 'expense_detail_screen.dart';
 import 'reports_screen.dart';
+import 'edit_group_screen.dart';
+import '../widgets/currency_text.dart';
 
 class GroupDetailScreen extends StatelessWidget {
   final Group group;
@@ -154,10 +155,8 @@ class _ExpenseCard extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ExpenseDetailScreen(
-                expense: expense,
-                group: group,
-              ),
+              builder: (context) =>
+                  ExpenseDetailScreen(expense: expense, group: group),
             ),
           );
         },
@@ -193,16 +192,16 @@ class _ExpenseCard extends StatelessWidget {
                         ),
                         Text(
                           DateFormat('MMM dd, yyyy').format(expense.date),
-                          style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  Text(
-                    NumberFormat.currency(
-                      symbol: '\$',
-                      decimalDigits: 2,
-                    ).format(expense.amount),
+                  CurrencyText(
+                    amount: expense.amount,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -302,7 +301,8 @@ class _BalancesTab extends StatelessWidget {
           );
         }
 
-        final settlements = snapshot.data![0] as Map<String, Map<String, double>>;
+        final settlements =
+            snapshot.data![0] as Map<String, Map<String, double>>;
         final totalExpenses = snapshot.data![1] as double;
 
         if (settlements.isEmpty) {
@@ -339,11 +339,8 @@ class _BalancesTab extends StatelessWidget {
                       style: TextStyle(fontSize: 16, color: Colors.teal),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      NumberFormat.currency(
-                        symbol: '\$',
-                        decimalDigits: 2,
-                      ).format(totalExpenses),
+                    CurrencyText(
+                      amount: totalExpenses,
                       style: const TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -368,7 +365,7 @@ class _BalancesTab extends StatelessWidget {
                 final creditorId = creditorEntry.key;
                 final amount = creditorEntry.value;
                 final creditor = group.members.firstWhere(
-                      (m) => m.id == creditorId,
+                  (m) => m.id == creditorId,
                 );
 
                 return Card(
@@ -420,11 +417,8 @@ class _BalancesTab extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Text(
-                                NumberFormat.currency(
-                                  symbol: '\$',
-                                  decimalDigits: 2,
-                                ).format(amount),
+                              CurrencyText(
+                                amount: amount,
                                 style: TextStyle(
                                   color: Colors.green[700],
                                   fontWeight: FontWeight.bold,
@@ -567,13 +561,41 @@ class _MemberCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'Paid: ${NumberFormat.currency(symbol: '\$', decimalDigits: 2).format(totalPaid)}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      Row(
+                        children: [
+                          Text(
+                            'Paid: ',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 13,
+                            ),
+                          ),
+                          CurrencyText(
+                            amount: totalPaid,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        'Owes: ${NumberFormat.currency(symbol: '\$', decimalDigits: 2).format(totalOwed)}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      Row(
+                        children: [
+                          Text(
+                            'Owes: ',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 13,
+                            ),
+                          ),
+                          CurrencyText(
+                            amount: totalOwed,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -587,17 +609,28 @@ class _MemberCard extends StatelessWidget {
                     color: balance >= 0 ? Colors.green[50] : Colors.red[50],
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    balance >= 0
-                        ? '+${NumberFormat.currency(symbol: '\$', decimalDigits: 2).format(balance)}'
-                        : NumberFormat.currency(
-                      symbol: '\$',
-                      decimalDigits: 2,
-                    ).format(balance),
-                    style: TextStyle(
-                      color: balance >= 0 ? Colors.green[700] : Colors.red[700],
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        balance >= 0 ? '+' : '',
+                        style: TextStyle(
+                          color: balance >= 0
+                              ? Colors.green[700]
+                              : Colors.red[700],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      CurrencyText(
+                        amount: balance.abs(),
+                        style: TextStyle(
+                          color: balance >= 0
+                              ? Colors.green[700]
+                              : Colors.red[700],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

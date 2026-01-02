@@ -1,5 +1,5 @@
-name: expenser
-description: "An expense manager project."
+name: group_xpense
+description: "A group expense manager with split functionality"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -15,6 +15,8 @@ dependencies:
   shared_preferences: ^2.3.3
   sqflite: ^2.3.3+2
   path: ^1.9.0
+  local_auth: ^2.2.0
+  flutter_markdown: ^0.6.18
 
 dev_dependencies:
   flutter_test:

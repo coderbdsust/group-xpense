@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/expense_provider.dart';
+import '../providers/settings_provider.dart';
 import '../models/group.dart';
 import '../models/person.dart';
 import '../models/expense.dart';
@@ -11,11 +12,7 @@ class AddExpenseScreen extends StatefulWidget {
   final Group group;
   final Expense? expense;
 
-  const AddExpenseScreen({
-    super.key,
-    required this.group,
-    this.expense,
-  });
+  const AddExpenseScreen({super.key, required this.group, this.expense});
 
   @override
   State<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -45,11 +42,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   void initState() {
     super.initState();
 
-    // Check if editing existing expense
     if (widget.expense != null) {
       _loadExistingExpense();
     } else {
-      // New expense - set defaults
       if (widget.group.members.isNotEmpty) {
         _paidBy = widget.group.members.first;
         _participants.addAll(widget.group.members);
@@ -66,11 +61,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     _paidBy = expense.paidBy;
     _participants.addAll(expense.participants);
 
-    // Detect if it's equal or custom split
     if (expense.splits.isNotEmpty) {
       final firstSplit = expense.splits.values.first;
-      final isEqual = expense.splits.values
-          .every((split) => (split - firstSplit).abs() < 0.01);
+      final isEqual = expense.splits.values.every(
+        (split) => (split - firstSplit).abs() < 0.01,
+      );
 
       _splitType = isEqual ? 'equal' : 'custom';
 
@@ -128,14 +123,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       final amount = double.parse(_amountController.text);
       final splits = _calculateSplits();
 
-      // Validate custom splits
       if (_splitType == 'custom') {
         final totalSplit = splits.values.fold(0.0, (sum, val) => sum + val);
         if ((totalSplit - amount).abs() > 0.01) {
+          final currencySymbol = Provider.of<SettingsProvider>(
+            context,
+            listen: false,
+          ).settings.currencySymbol;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Split amounts must equal total: \$${amount.toStringAsFixed(2)}',
+                'Split amounts must equal total: $currencySymbol${amount.toStringAsFixed(2)}',
               ),
               backgroundColor: Colors.orange,
             ),
@@ -159,7 +157,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       final provider = Provider.of<ExpenseProvider>(context, listen: false);
 
       if (widget.expense != null) {
-        // Update existing expense
         provider.updateExpense(expense);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -168,7 +165,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           ),
         );
       } else {
-        // Add new expense
         provider.addExpense(expense);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -185,11 +181,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.expense != null;
+    final currencySymbol = Provider.of<SettingsProvider>(
+      context,
+    ).settings.currencySymbol;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Expense' : 'Add Expense'),
-      ),
+      appBar: AppBar(title: Text(isEditing ? 'Edit Expense' : 'Add Expense')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -234,6 +231,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         hintText: '0.00',
                         hintStyle: TextStyle(color: Colors.grey[400]),
                         prefixIcon: const Icon(Icons.attach_money),
+                        prefixText: '$currencySymbol ',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -266,22 +264,23 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         labelStyle: const TextStyle(color: Colors.teal),
                         hintText: 'Select a category',
                         hintStyle: TextStyle(color: Colors.grey[400]),
-                        prefixIcon:
-                        const Icon(Icons.category, color: Colors.teal),
+                        prefixIcon: const Icon(
+                          Icons.category,
+                          color: Colors.teal,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide:
-                          const BorderSide(color: Colors.teal, width: 2),
+                          borderSide: const BorderSide(
+                            color: Colors.teal,
+                            width: 2,
+                          ),
                         ),
                       ),
                       dropdownColor: Colors.teal[50],
-                      style: const TextStyle(
-                        color: Colors.teal,
-                        fontSize: 16,
-                      ),
+                      style: const TextStyle(color: Colors.teal, fontSize: 16),
                       items: _categories.map((category) {
                         return DropdownMenuItem(
                           value: category,
@@ -322,22 +321,23 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     DropdownButtonFormField<Person>(
                       value: _paidBy,
                       decoration: InputDecoration(
-                        prefixIcon:
-                        const Icon(Icons.person, color: Colors.teal),
+                        prefixIcon: const Icon(
+                          Icons.person,
+                          color: Colors.teal,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide:
-                          const BorderSide(color: Colors.teal, width: 2),
+                          borderSide: const BorderSide(
+                            color: Colors.teal,
+                            width: 2,
+                          ),
                         ),
                       ),
                       dropdownColor: Colors.teal[50],
-                      style: const TextStyle(
-                        color: Colors.teal,
-                        fontSize: 16,
-                      ),
+                      style: const TextStyle(color: Colors.teal, fontSize: 16),
                       items: widget.group.members.map((person) {
                         return DropdownMenuItem(
                           value: person,
@@ -422,8 +422,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                           double.tryParse(_amountController.text) ?? 0;
                       final splitAmount = _splitType == 'equal'
                           ? (_participants.isNotEmpty
-                          ? amount / _participants.length
-                          : 0)
+                                ? amount / _participants.length
+                                : 0)
                           : (_customSplits[person.id] ?? 0);
 
                       return CheckboxListTile(
@@ -441,12 +441,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         title: Text(person.name),
                         subtitle: isSelected
                             ? Text(
-                          '\$${splitAmount.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            color: Colors.teal[700],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
+                                '$currencySymbol${splitAmount.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  color: Colors.teal[700],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
                             : null,
                         secondary: CircleAvatar(
                           backgroundColor: Colors.teal[100],
@@ -463,8 +463,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                         ),
                       );
                     }),
-                    if (_splitType == 'custom' &&
-                        _participants.isNotEmpty) ...[
+                    if (_splitType == 'custom' && _participants.isNotEmpty) ...[
                       const Divider(height: 24),
                       const Text(
                         'Custom Split Amounts',
@@ -482,14 +481,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                               Expanded(flex: 2, child: Text(person.name)),
                               Expanded(
                                 child: TextFormField(
-                                  initialValue: _customSplits[person.id]
-                                      ?.toStringAsFixed(2) ??
+                                  initialValue:
+                                      _customSplits[person.id]?.toStringAsFixed(
+                                        2,
+                                      ) ??
                                       '',
                                   decoration: InputDecoration(
-                                    prefixText: '\$ ',
+                                    prefixText: '$currencySymbol ',
                                     hintText: '0.00',
-                                    hintStyle:
-                                    TextStyle(color: Colors.grey[400]),
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                    ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -506,9 +508,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                     ),
                                   ),
                                   keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                   inputFormatters: [
                                     FilteringTextInputFormatter.allow(
                                       RegExp(r'^\d+\.?\d{0,2}'),
@@ -536,7 +538,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              '\$${_customSplits.values.fold(0.0, (sum, val) => sum + val).toStringAsFixed(2)}',
+                              '$currencySymbol${_customSplits.values.fold(0.0, (sum, val) => sum + val).toStringAsFixed(2)}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.teal,

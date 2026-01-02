@@ -1,4 +1,4 @@
-# Expenser - Group Expense Manager
+# Group Xpense - Group Expense Manager
 
 A beautiful and intuitive Flutter application for managing group expenses with smart splitting capabilities, persistent storage, and comprehensive reporting.
 
@@ -82,10 +82,10 @@ A beautiful and intuitive Flutter application for managing group expenses with s
 ### Steps
 ```bash
 # 1. Clone the repository
-git clone https://github.com/coderbdsust/expenser_app.git
+git clone https://github.com/coderbdsust/group-xpense.git
 
 # 2. Navigate to project directory
-cd expenser
+cd group_xpense
 
 # 3. Install dependencies
 flutter pub get
@@ -97,7 +97,7 @@ flutter run            # For Android/iOS
 
 ## 🗂️ Project Structure
 ```
-expenser_app/
+group_xpense/
 ├── lib/
 │   ├── main.dart                       # App entry + Teal/Cyan theme
 │   ├── models/

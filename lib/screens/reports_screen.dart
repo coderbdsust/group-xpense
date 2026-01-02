@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/group.dart';
 import '../providers/expense_provider.dart';
+import '../widgets/currency_text.dart';
 
 class ReportsScreen extends StatelessWidget {
   final Group group;
@@ -12,9 +13,7 @@ class ReportsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports'),
-      ),
+      appBar: AppBar(title: const Text('Reports')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -77,12 +76,24 @@ class _CategoryReportCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(entry.key),
-                              Text(
-                                '${NumberFormat.currency(symbol: '\$', decimalDigits: 0).format(entry.value)} (${percentage.toStringAsFixed(1)}%)',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.teal,
-                                ),
+                              Row(
+                                children: [
+                                  CurrencyText(
+                                    amount: entry.value,
+                                    decimalDigits: 0,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal,
+                                    ),
+                                  ),
+                                  Text(
+                                    ' (${percentage.toStringAsFixed(1)}%)',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -160,9 +171,8 @@ class _MonthlyReportCard extends StatelessWidget {
                         ),
                       ),
                       title: Text(monthName),
-                      trailing: Text(
-                        NumberFormat.currency(symbol: '\$', decimalDigits: 2)
-                            .format(amount),
+                      trailing: CurrencyText(
+                        amount: amount,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.teal,
@@ -218,14 +228,16 @@ class _SummaryReportCard extends StatelessWidget {
 
                 final expenses = snapshot.data![0] as List;
                 final total = snapshot.data![1] as double;
-                final average = expenses.isEmpty ? 0.0 : total / expenses.length;
+                final average = expenses.isEmpty
+                    ? 0.0
+                    : total / expenses.length;
 
                 return Column(
                   children: [
                     _SummaryRow(
                       label: 'Total Expenses',
-                      value: NumberFormat.currency(symbol: '\$', decimalDigits: 2)
-                          .format(total),
+                      value: '',
+                      amount: total,
                     ),
                     const Divider(),
                     _SummaryRow(
@@ -235,14 +247,14 @@ class _SummaryReportCard extends StatelessWidget {
                     const Divider(),
                     _SummaryRow(
                       label: 'Average per Expense',
-                      value: NumberFormat.currency(symbol: '\$', decimalDigits: 2)
-                          .format(average),
+                      value: '',
+                      amount: average,
                     ),
                     const Divider(),
                     _SummaryRow(
                       label: 'Per Member',
-                      value: NumberFormat.currency(symbol: '\$', decimalDigits: 2)
-                          .format(total / group.members.length),
+                      value: '',
+                      amount: total / group.members.length,
                     ),
                   ],
                 );
@@ -258,8 +270,9 @@ class _SummaryReportCard extends StatelessWidget {
 class _SummaryRow extends StatelessWidget {
   final String label;
   final String value;
+  final double? amount;
 
-  const _SummaryRow({required this.label, required this.value});
+  const _SummaryRow({required this.label, required this.value, this.amount});
 
   @override
   Widget build(BuildContext context) {
@@ -269,14 +282,24 @@ class _SummaryRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: Colors.grey[700])),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.teal,
-              fontSize: 16,
+          if (amount != null)
+            CurrencyText(
+              amount: amount!,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+                fontSize: 16,
+              ),
+            )
+          else
+            Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+                fontSize: 16,
+              ),
             ),
-          ),
         ],
       ),
     );
