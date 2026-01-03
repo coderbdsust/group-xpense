@@ -259,12 +259,12 @@ class _AboutSection extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.info_outline, color: Colors.teal),
           title: const Text('Version'),
-          subtitle: const Text('2.1.0'),
+          subtitle: const Text('1.0.0'),
         ),
         ListTile(
           leading: const Icon(Icons.code, color: Colors.teal),
           title: const Text('Developer'),
-          subtitle: const Text('Built with Flutter'),
+          subtitle: const Text('Biswajit Debnath'),
         ),
         ListTile(
           leading: const Icon(Icons.privacy_tip, color: Colors.teal),

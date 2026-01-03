@@ -133,7 +133,7 @@ None of these services transmit data externally.
 If you have questions about this Privacy Policy or our privacy practices:
 
 **Email**: biswajit.sust@gmail.com  
-**Website**: https://group-expense.firebaseapp.com/  
+**Website**: https://group-expense.firebaseapp.com  
 **Response Time**: Within 48 hours
 
 ## Compliance
