@@ -8,8 +8,55 @@ import 'edit_group_screen.dart';
 import 'settings_screen.dart';
 import '../widgets/currency_text.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _isRefreshing = false;
+
+  Future<void> _refreshGroups() async {
+    if (_isRefreshing) return;
+
+    setState(() => _isRefreshing = true);
+
+    try {
+      final provider = Provider.of<ExpenseProvider>(context, listen: false);
+      await provider.refreshGroups();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Text('Groups refreshed'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Refresh failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +64,20 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Group Xpense'),
         actions: [
+          IconButton(
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            onPressed: _isRefreshing ? null : _refreshGroups,
+            tooltip: 'Refresh',
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
@@ -50,40 +111,67 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: Consumer<ExpenseProvider>(
-        builder: (context, provider, child) {
-          if (provider.groups.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.group_add, size: 100, color: Colors.teal[200]),
-                  const SizedBox(height: 24),
-                  Text(
-                    'No groups yet',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.grey[700],
+      body: RefreshIndicator(
+        onRefresh: _refreshGroups,
+        child: Consumer<ExpenseProvider>(
+          builder: (context, provider, child) {
+            if (provider.groups.isEmpty) {
+              return Center(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.group_add,
+                          size: 100,
+                          color: Colors.teal[200],
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'No groups yet',
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(color: Colors.grey[700]),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Create a group to start tracking expenses',
+                          style: TextStyle(color: Colors.grey[600]),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        FilledButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const CreateGroupScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Create Your First Group'),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Create a group to start tracking expenses',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            );
-          }
+                ),
+              );
+            }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: provider.groups.length,
-            itemBuilder: (context, index) {
-              final group = provider.groups[index];
-              return _GroupCard(group: group);
-            },
-          );
-        },
+            return ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: provider.groups.length,
+              itemBuilder: (context, index) {
+                final group = provider.groups[index];
+                return _GroupCard(group: group);
+              },
+            );
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {

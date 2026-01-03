@@ -20,6 +20,10 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshGroups() async {
+    await loadGroups();
+  }
+
   Future<void> addGroup(Group group) async {
     await _db.insertGroup(group);
     await loadGroups();

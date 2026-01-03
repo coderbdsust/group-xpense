@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:file_picker/file_picker.dart';
 import '../models/group.dart';
 import '../models/person.dart';
 import '../models/expense.dart';
@@ -28,34 +28,46 @@ class ExportImportService {
         'name': group.name,
         'description': group.description,
         'createdAt': group.createdAt.toIso8601String(),
-        'members': group.members.map((m) => {
-          'id': m.id,
-          'name': m.name,
-          'email': m.email,
-          'avatar': m.avatar,
-        }).toList(),
+        'members': group.members
+            .map(
+              (m) => {
+            'id': m.id,
+            'name': m.name,
+            'email': m.email,
+            'avatar': m.avatar,
+          },
+        )
+            .toList(),
       },
-      'expenses': expenses.map((e) => {
-        'id': e.id,
-        'groupId': e.groupId,
-        'description': e.description,
-        'amount': e.amount,
-        'paidBy': {
-          'id': e.paidBy.id,
-          'name': e.paidBy.name,
-          'email': e.paidBy.email,
-          'avatar': e.paidBy.avatar,
+      'expenses': expenses
+          .map(
+            (e) => {
+          'id': e.id,
+          'groupId': e.groupId,
+          'description': e.description,
+          'amount': e.amount,
+          'paidBy': {
+            'id': e.paidBy.id,
+            'name': e.paidBy.name,
+            'email': e.paidBy.email,
+            'avatar': e.paidBy.avatar,
+          },
+          'participants': e.participants
+              .map(
+                (p) => {
+              'id': p.id,
+              'name': p.name,
+              'email': p.email,
+              'avatar': p.avatar,
+            },
+          )
+              .toList(),
+          'splits': e.splits,
+          'date': e.date.toIso8601String(),
+          'category': e.category,
         },
-        'participants': e.participants.map((p) => {
-          'id': p.id,
-          'name': p.name,
-          'email': p.email,
-          'avatar': p.avatar,
-        }).toList(),
-        'splits': e.splits,
-        'date': e.date.toIso8601String(),
-        'category': e.category,
-      }).toList(),
+      )
+          .toList(),
     };
   }
 
@@ -78,10 +90,25 @@ class ExportImportService {
     };
   }
 
-  // Save JSON to file and share
-  static Future<File> saveAndShareJson(Map<String, dynamic> data, String fileName) async {
+  // Get export directory
+  static Future<Directory> getExportDirectory() async {
     final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/$fileName');
+    final exportDir = Directory('${directory.path}/GroupXpenseExports');
+
+    if (!await exportDir.exists()) {
+      await exportDir.create(recursive: true);
+    }
+
+    return exportDir;
+  }
+
+  // Save JSON to local file system
+  static Future<File> saveToLocalFileSystem(
+      Map<String, dynamic> data,
+      String fileName,
+      ) async {
+    final exportDir = await getExportDirectory();
+    final file = File('${exportDir.path}/$fileName');
 
     final jsonString = const JsonEncoder.withIndent('  ').convert(data);
     await file.writeAsString(jsonString);
@@ -89,11 +116,30 @@ class ExportImportService {
     return file;
   }
 
-  // Export and share single group
-  static Future<void> exportAndShareGroup(String groupId, String groupName) async {
+  // Export single group to local file system
+  static Future<File> exportGroupToFile(
+      String groupId,
+      String groupName,
+      ) async {
     final data = await exportGroupToJson(groupId);
-    final fileName = '${groupName.replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}.json';
-    final file = await saveAndShareJson(data, fileName);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final fileName = '${groupName.replaceAll(' ', '_')}_$timestamp.json';
+
+    return await saveToLocalFileSystem(data, fileName);
+  }
+
+  // Export all groups to local file system
+  static Future<File> exportAllGroupsToFile() async {
+    final data = await exportAllGroupsToJson();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final fileName = 'group_xpense_backup_$timestamp.json';
+
+    return await saveToLocalFileSystem(data, fileName);
+  }
+
+  // Export and share (keep for sharing functionality)
+  static Future<void> shareGroupFile(String groupId, String groupName) async {
+    final file = await exportGroupToFile(groupId, groupName);
 
     await Share.shareXFiles(
       [XFile(file.path)],
@@ -102,11 +148,9 @@ class ExportImportService {
     );
   }
 
-  // Export and share all groups
-  static Future<void> exportAndShareAllGroups() async {
-    final data = await exportAllGroupsToJson();
-    final fileName = 'group_xpense_backup_${DateTime.now().millisecondsSinceEpoch}.json';
-    final file = await saveAndShareJson(data, fileName);
+  // Export and share all
+  static Future<void> shareAllGroupsFile() async {
+    final file = await exportAllGroupsToFile();
 
     await Share.shareXFiles(
       [XFile(file.path)],
@@ -115,9 +159,69 @@ class ExportImportService {
     );
   }
 
-  // Import group from JSON
-  static Future<void> importGroupFromJson(Map<String, dynamic> data) async {
-    // Validate version
+  // Get all exported files
+  static Future<List<File>> getExportedFiles() async {
+    final exportDir = await getExportDirectory();
+
+    if (!await exportDir.exists()) {
+      return [];
+    }
+
+    final files = exportDir
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.json'))
+        .toList();
+
+    // Sort by modification time (newest first)
+    files.sort(
+          (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+    );
+
+    return files;
+  }
+
+  // Delete exported file
+  static Future<void> deleteExportedFile(String filePath) async {
+    final file = File(filePath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
+
+  // Get file size
+  static Future<String> getFileSize(String filePath) async {
+    final file = File(filePath);
+    final bytes = await file.length();
+
+    if (bytes < 1024) {
+      return '$bytes B';
+    } else if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    } else {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+  }
+
+  // Import from file path with duplicate handling
+  static Future<String> importFromFilePath(String filePath) async {
+    final file = File(filePath);
+    final jsonString = await file.readAsString();
+    final data = json.decode(jsonString);
+
+    if (data.containsKey('groups')) {
+      final result = await importAllGroupsFromJson(data);
+      return result;
+    } else if (data.containsKey('group')) {
+      final result = await importGroupFromJson(data);
+      return result;
+    } else {
+      throw Exception('Invalid backup file format');
+    }
+  }
+
+  // Import group from JSON - returns result message
+  static Future<String> importGroupFromJson(Map<String, dynamic> data) async {
     if (data['version'] != '1.0') {
       throw Exception('Unsupported backup version');
     }
@@ -125,100 +229,271 @@ class ExportImportService {
     final groupData = data['group'];
     final expensesData = data['expenses'] as List;
 
-    // Create members
-    final members = (groupData['members'] as List).map((m) => Person(
-      id: m['id'],
-      name: m['name'],
-      email: m['email'],
-      avatar: m['avatar'],
-    )).toList();
+    // Check if group already exists - SKIP if it does
+    final existingGroup = await _db.getGroup(groupData['id']);
 
-    // Create group
-    final group = Group(
-      id: groupData['id'],
-      name: groupData['name'],
-      description: groupData['description'],
-      members: members,
-      createdAt: DateTime.parse(groupData['createdAt']),
-    );
-
-    // Check if group already exists
-    final existingGroup = await _db.getGroup(group.id);
     if (existingGroup != null) {
-      throw Exception('Group "${group.name}" already exists. Please delete it first or rename the imported group.');
+      // Silently skip this group
+      return 'skipped:${groupData['name']}';
     }
 
-    // Insert group
-    await _db.insertGroup(group);
+    try {
+      // Parse members
+      final members = (groupData['members'] as List)
+          .map(
+            (m) => Person(
+          id: m['id'],
+          name: m['name'],
+          email: m['email'],
+          avatar: m['avatar'],
+        ),
+      )
+          .toList();
 
-    // Insert expenses
-    for (var expenseData in expensesData) {
-      final paidBy = members.firstWhere((m) => m.id == expenseData['paidBy']['id']);
-
-      final participantIds = (expenseData['participants'] as List).map((p) => p['id'] as String).toList();
-      final participants = members.where((m) => participantIds.contains(m.id)).toList();
-
-      final expense = Expense(
-        id: expenseData['id'],
-        groupId: expenseData['groupId'],
-        description: expenseData['description'],
-        amount: expenseData['amount'],
-        paidBy: paidBy,
-        participants: participants,
-        splits: Map<String, double>.from(expenseData['splits']),
-        date: DateTime.parse(expenseData['date']),
-        category: expenseData['category'],
+      // Create group
+      final group = Group(
+        id: groupData['id'],
+        name: groupData['name'],
+        description: groupData['description'],
+        members: members,
+        createdAt: DateTime.parse(groupData['createdAt']),
       );
 
-      await _db.insertExpense(expense);
+      await _db.insertGroup(group);
+
+      // Import expenses
+      for (var expenseData in expensesData) {
+        try {
+          final paidBy = members.firstWhere(
+                (m) => m.id == expenseData['paidBy']['id'],
+          );
+
+          final participantIds = (expenseData['participants'] as List)
+              .map((p) => p['id'] as String)
+              .toList();
+          final participants = members
+              .where((m) => participantIds.contains(m.id))
+              .toList();
+
+          final expense = Expense(
+            id: expenseData['id'],
+            groupId: expenseData['groupId'],
+            description: expenseData['description'],
+            amount: (expenseData['amount'] as num).toDouble(),
+            paidBy: paidBy,
+            participants: participants,
+            splits: Map<String, double>.from(expenseData['splits']),
+            date: DateTime.parse(expenseData['date']),
+            category: expenseData['category'],
+          );
+
+          await _db.insertExpense(expense);
+        } catch (e) {
+          // Skip individual expense if it fails (e.g., duplicate expense ID)
+          print('Skipped expense in ${groupData['name']}: $e');
+          continue;
+        }
+      }
+
+      return 'success:${groupData['name']}';
+    } catch (e) {
+      // If group insert fails, return skip
+      print('Failed to import group ${groupData['name']}: $e');
+      return 'error:${groupData['name']}';
     }
   }
 
-  // Import all groups from JSON
-  static Future<void> importAllGroupsFromJson(Map<String, dynamic> data) async {
+  // Import all groups from JSON with skip/count logic
+  static Future<String> importAllGroupsFromJson(Map<String, dynamic> data) async {
     if (data['version'] != '1.0') {
       throw Exception('Unsupported backup version');
     }
 
     final groupsData = data['groups'] as List;
+    int successCount = 0;
+    int skippedCount = 0;
+    int errorCount = 0;
+    final skippedGroups = <String>[];
+    final errorGroups = <String>[];
 
     for (var groupData in groupsData) {
       try {
-        await importGroupFromJson(groupData);
+        final result = await importGroupFromJson(groupData);
+
+        if (result.startsWith('success:')) {
+          successCount++;
+        } else if (result.startsWith('skipped:')) {
+          skippedCount++;
+          final groupName = result.substring('skipped:'.length);
+          skippedGroups.add(groupName);
+        } else if (result.startsWith('error:')) {
+          errorCount++;
+          final groupName = result.substring('error:'.length);
+          errorGroups.add(groupName);
+        }
       } catch (e) {
-        // Continue with next group if one fails
-        print('Failed to import group: $e');
+        errorCount++;
+        errorGroups.add(groupData['group']['name']);
+        print('Error importing group: $e');
       }
+    }
+
+    // Build result message
+    final messages = <String>[];
+
+    if (successCount > 0) {
+      messages.add('Imported $successCount group${successCount > 1 ? 's' : ''}');
+    }
+
+    if (skippedCount > 0) {
+      messages.add('Skipped $skippedCount duplicate${skippedCount > 1 ? 's' : ''}');
+    }
+
+    if (errorCount > 0) {
+      messages.add('$errorCount failed');
+    }
+
+    if (messages.isEmpty) {
+      return 'No groups were imported';
+    }
+
+    return messages.join('. ');
+  }
+
+  static Future<List<FileSystemEntity>> getJsonFilesFromDocuments() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final exportDir = Directory('${directory.path}/GroupXpenseExports');
+
+    if (!await exportDir.exists()) {
+      return [];
+    }
+
+    final files = exportDir
+        .listSync()
+        .where((file) => file.path.endsWith('.json'))
+        .toList();
+
+    files.sort((a, b) {
+      final aStat = (a as File).statSync();
+      final bStat = (b as File).statSync();
+      return bStat.modified.compareTo(aStat.modified);
+    });
+
+    return files;
+  }
+
+  static Future<Map<String, dynamic>?> readAndValidateJson(
+      String filePath,
+      ) async {
+    try {
+      final file = File(filePath);
+      final jsonString = await file.readAsString();
+      final data = json.decode(jsonString);
+
+      // Validate structure
+      if (data['version'] != '1.0') {
+        return null;
+      }
+
+      // Check if it's a valid backup
+      if (!data.containsKey('group') && !data.containsKey('groups')) {
+        return null;
+      }
+
+      return data;
+    } catch (e) {
+      print('Error reading JSON: $e');
+      return null;
     }
   }
 
-  // Pick and import JSON file
-  static Future<String> pickAndImportJsonFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-    );
+  static Future<File?> pickFileFromDevice() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        dialogTitle: 'Select Backup File',
+      );
 
-    if (result == null || result.files.isEmpty) {
+      if (result == null || result.files.isEmpty) {
+        return null;
+      }
+
+      final filePath = result.files.single.path;
+      if (filePath == null) {
+        return null;
+      }
+
+      return File(filePath);
+    } catch (e) {
+      print('File picker error: $e');
+      return null;
+    }
+  }
+
+  // Import from picked file
+  static Future<String> importFromPickedFile() async {
+    final file = await pickFileFromDevice();
+
+    if (file == null) {
       throw Exception('No file selected');
     }
 
-    final file = File(result.files.single.path!);
-    final jsonString = await file.readAsString();
-    final data = json.decode(jsonString);
-
-    // Check if it's a single group or all groups backup
-    if (data.containsKey('groups')) {
-      // All groups backup
-      await importAllGroupsFromJson(data);
-      final groupCount = (data['groups'] as List).length;
-      return 'Successfully imported $groupCount group(s)';
-    } else if (data.containsKey('group')) {
-      // Single group backup
-      await importGroupFromJson(data);
-      return 'Successfully imported group: ${data['group']['name']}';
-    } else {
-      throw Exception('Invalid backup file format');
+    // Validate file
+    final preview = await readAndValidateJson(file.path);
+    if (preview == null) {
+      throw Exception(
+        'Invalid backup file. Please select a valid Group Xpense backup JSON file.',
+      );
     }
+
+    // Import the file
+    return await importFromFilePath(file.path);
+  }
+
+  static Future<File> copyFileToAppStorage(File sourceFile) async {
+    final exportDir = await getExportDirectory();
+    final fileName = sourceFile.path.split('/').last;
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+    var newFileName = fileName;
+    var targetFile = File('${exportDir.path}/$newFileName');
+
+    if (await targetFile.exists()) {
+      final nameWithoutExt = fileName.replaceAll('.json', '');
+      newFileName = '${nameWithoutExt}_$timestamp.json';
+      targetFile = File('${exportDir.path}/$newFileName');
+    }
+
+    await sourceFile.copy(targetFile.path);
+    return targetFile;
+  }
+
+  // Helper to check for duplicate groups before import
+  static Future<List<String>> checkForDuplicates(String filePath) async {
+    final data = await readAndValidateJson(filePath);
+    if (data == null) return [];
+
+    final duplicates = <String>[];
+
+    if (data.containsKey('groups')) {
+      for (var groupData in data['groups'] as List) {
+        final groupId = groupData['group']['id'];
+        final groupName = groupData['group']['name'];
+        final existing = await _db.getGroup(groupId);
+        if (existing != null) {
+          duplicates.add(groupName);
+        }
+      }
+    } else if (data.containsKey('group')) {
+      final groupId = data['group']['id'];
+      final groupName = data['group']['name'];
+      final existing = await _db.getGroup(groupId);
+      if (existing != null) {
+        duplicates.add(groupName);
+      }
+    }
+
+    return duplicates;
   }
 }
