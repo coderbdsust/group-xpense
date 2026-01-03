@@ -5,6 +5,7 @@ import '../services/currency_service.dart';
 import '../services/biometric_service.dart';
 import '../utils/privacy_policy.dart';
 import 'privacy_policy_screen.dart';
+import 'export_import_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -20,6 +21,8 @@ class SettingsScreen extends StatelessWidget {
           _SecuritySection(),
           const Divider(height: 32),
           _CurrencySection(),
+          const Divider(height: 32),
+          _DataManagementSection(),
           const Divider(height: 32),
           _AboutSection(),
         ],
@@ -284,6 +287,41 @@ class _AboutSection extends StatelessWidget {
           leading: const Icon(Icons.security, color: Colors.teal),
           title: const Text('Privacy'),
           subtitle: const Text('All data stored locally on your device'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DataManagementSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Data Management',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Colors.teal,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.import_export, color: Colors.teal),
+          title: const Text('Backup & Restore'),
+          subtitle: const Text('Export and import your expense data'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ExportImportScreen(),
+              ),
+            );
+          },
         ),
       ],
     );

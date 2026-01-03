@@ -47,5 +47,11 @@
 	<true/>
     <key>NSFaceIDUsageDescription</key>
     <string>We need to use Face ID to secure your expense data</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Group Xpense needs access to save backup files</string>
+    <key>UIFileSharingEnabled</key>
+    <true/>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
 </dict>
 </plist>
