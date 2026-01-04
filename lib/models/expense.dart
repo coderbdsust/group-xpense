@@ -111,6 +111,43 @@ class Expense {
     );
   }
 
+  // For JSON export/import (with plain objects, not JSON-encoded strings)
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'groupId': groupId,
+      'description': description,
+      'amount': amount,
+      'payers': payers.map((p) => p.toJson()).toList(),
+      'participants': participants.map((p) => p.toJson()).toList(),
+      'splits': splits,
+      'date': date.toIso8601String(),
+      'category': category,
+      'notes': notes,
+      'isSettlement': isSettlement,
+    };
+  }
+
+  factory Expense.fromJson(Map<String, dynamic> json) {
+    return Expense(
+      id: json['id'] as String,
+      groupId: json['groupId'] as String,
+      description: json['description'] as String,
+      amount: (json['amount'] as num).toDouble(),
+      payers: (json['payers'] as List)
+          .map((p) => PayerShare.fromJson(p as Map<String, dynamic>))
+          .toList(),
+      participants: (json['participants'] as List)
+          .map((p) => Person.fromJson(p as Map<String, dynamic>))
+          .toList(),
+      splits: Map<String, double>.from(json['splits']),
+      date: DateTime.parse(json['date'] as String),
+      category: json['category'] as String?,
+      notes: json['notes'] as String?,
+      isSettlement: json['isSettlement'] == true,
+    );
+  }
+
   Expense copyWith({
     String? id,
     String? groupId,
@@ -161,6 +198,12 @@ class PayerShare {
       amount: (map['amount'] as num).toDouble(),
     );
   }
+
+  // For JSON export/import (same as toMap for PayerShare)
+  Map<String, dynamic> toJson() => toMap();
+
+  factory PayerShare.fromJson(Map<String, dynamic> json) =>
+      PayerShare.fromMap(json);
 
   @override
   String toString() => 'PayerShare(person: ${person.name}, amount: $amount)';

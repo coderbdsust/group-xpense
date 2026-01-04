@@ -23,6 +23,11 @@ class Person {
     );
   }
 
+  // For JSON export/import (same as toMap for Person since it's simple)
+  Map<String, dynamic> toJson() => toMap();
+
+  factory Person.fromJson(Map<String, dynamic> json) => Person.fromMap(json);
+
   // Add copyWith method (useful for editing)
   Person copyWith({String? id, String? name, String? email, String? avatar}) {
     return Person(

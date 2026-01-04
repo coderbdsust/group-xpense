@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/group.dart';
-import '../models/person.dart';
 import '../models/expense.dart';
 import '../services/database_helper.dart';
 import '../utils/app_constants.dart';
@@ -26,34 +25,8 @@ class ExportImportService {
     return {
       'version': AppConstants.appVersion,
       'exportDate': DateTime.now().toIso8601String(),
-      'group': {
-        'id': group.id,
-        'name': group.name,
-        'description': group.description,
-        'createdAt': group.createdAt.toIso8601String(),
-        'members': group.members.map((m) => m.toMap()).toList(),
-      },
-      'expenses': expenses.map((e) {
-        return {
-          'id': e.id,
-          'groupId': e.groupId,
-          'description': e.description,
-          'amount': e.amount,
-          // Multi-payer support only
-          'payers': e.payers.map((payer) {
-            return {
-              'person': payer.person.toMap(),
-              'amount': payer.amount,
-            };
-          }).toList(),
-          'participants': e.participants.map((p) => p.toMap()).toList(),
-          'splits': e.splits,
-          'date': e.date.toIso8601String(),
-          'category': e.category,
-          'notes': e.notes,
-          'isSettlement': e.isSettlement,
-        };
-      }).toList(),
+      'group': group.toJson(),
+      'expenses': expenses.map((e) => e.toJson()).toList(),
     };
   }
 
@@ -221,128 +194,50 @@ class ExportImportService {
       final groupData = data['group'] as Map<String, dynamic>;
       final expensesData = data['expenses'] as List;
 
-      // Check if group already exists - SKIP if it does
-      final existingGroup = await _db.getGroup(groupData['id'] as String);
+      // Parse group using fromJson
+      final group = Group.fromJson(groupData);
+
+      // Check if group already exists
+      final existingGroup = await _db.getGroup(group.id);
 
       if (existingGroup != null) {
-        return 'skipped:${groupData['name']}';
+        // Group exists - update it instead of skipping
+        await _db.updateGroup(group);
+      } else {
+        // Group doesn't exist - insert it
+        await _db.insertGroup(group);
       }
-
-      // Parse members
-      final membersData = groupData['members'] as List;
-      final members = membersData.map((m) {
-        final memberMap = m as Map<String, dynamic>;
-        return Person(
-          id: memberMap['id'] as String,
-          name: memberMap['name'] as String,
-          email: memberMap['email'] as String?,
-          avatar: memberMap['avatar'] as String?,
-        );
-      }).toList();
-
-      // Create group
-      final group = Group(
-        id: groupData['id'] as String,
-        name: groupData['name'] as String,
-        description: groupData['description'] as String?,
-        members: members,
-        createdAt: DateTime.parse(groupData['createdAt'] as String),
-      );
-
-      await _db.insertGroup(group);
 
       // Import expenses with multi-payer support
       int successCount = 0;
-      int skipCount = 0;
 
       for (var expenseData in expensesData) {
         try {
           final expenseMap = expenseData as Map<String, dynamic>;
 
-          // Parse multi-payers (required field)
-          if (!expenseMap.containsKey('payers')) {
-            print('Skipped expense: Missing payers field');
-            skipCount++;
-            continue;
-          }
-
-          final payersData = expenseMap['payers'] as List;
-          final payers = payersData.map((payerData) {
-            final payerMap = payerData as Map<String, dynamic>;
-            final personMap = payerMap['person'] as Map<String, dynamic>;
-
-            final person = members.firstWhere(
-                  (m) => m.id == personMap['id'],
-              orElse: () => Person(
-                id: personMap['id'] as String,
-                name: personMap['name'] as String,
-                email: personMap['email'] as String?,
-                avatar: personMap['avatar'] as String?,
-              ),
-            );
-
-            return PayerShare(
-              person: person,
-              amount: (payerMap['amount'] as num).toDouble(),
-            );
-          }).toList();
+          // Parse expense using fromJson
+          final expense = Expense.fromJson(expenseMap);
 
           // Validate payers
-          if (payers.isEmpty) {
+          if (expense.payers.isEmpty) {
             print('Skipped expense: No payers found');
-            skipCount++;
             continue;
           }
 
-          // Parse participants
-          final participantsData = expenseMap['participants'] as List;
-          final participants = participantsData.map((p) {
-            final pMap = p as Map<String, dynamic>;
-            return members.firstWhere(
-                  (m) => m.id == pMap['id'],
-              orElse: () => Person(
-                id: pMap['id'] as String,
-                name: pMap['name'] as String,
-                email: pMap['email'] as String?,
-                avatar: pMap['avatar'] as String?,
-              ),
-            );
-          }).toList();
-
-          // Parse splits
-          final splitsMap = expenseMap['splits'] as Map<String, dynamic>;
-          final splits = <String, double>{};
-          splitsMap.forEach((key, value) {
-            splits[key] = (value as num).toDouble();
-          });
-
-          final expense = Expense(
-            id: expenseMap['id'] as String,
-            groupId: expenseMap['groupId'] as String,
-            description: expenseMap['description'] as String,
-            amount: (expenseMap['amount'] as num).toDouble(),
-            payers: payers,
-            participants: participants,
-            splits: splits,
-            date: DateTime.parse(expenseMap['date'] as String),
-            category: expenseMap['category'] as String?,
-            notes: expenseMap['notes'] as String?,
-            isSettlement: expenseMap['isSettlement'] == true,
-          );
-
+          // insertExpense now handles upsert automatically
           await _db.insertExpense(expense);
           successCount++;
         } catch (e) {
           print('Skipped expense: $e');
-          skipCount++;
           continue;
         }
       }
 
+      final action = existingGroup != null ? 'updated' : 'imported';
       if (successCount > 0) {
-        return 'success:${groupData['name']}';
+        return 'success:${group.name}:$action';
       } else {
-        return 'error:${groupData['name']}';
+        return 'error:${group.name}';
       }
     } catch (e) {
       print('Failed to import group: $e');
@@ -363,8 +258,8 @@ class ExportImportService {
       }
 
       final groupsData = data['groups'] as List;
-      int successCount = 0;
-      int skippedCount = 0;
+      int importedCount = 0;
+      int updatedCount = 0;
       int errorCount = 0;
 
       for (var groupData in groupsData) {
@@ -374,9 +269,14 @@ class ExportImportService {
           );
 
           if (result.startsWith('success:')) {
-            successCount++;
-          } else if (result.startsWith('skipped:')) {
-            skippedCount++;
+            if (result.contains(':imported')) {
+              importedCount++;
+            } else if (result.contains(':updated')) {
+              updatedCount++;
+            } else {
+              // Fallback for old format
+              importedCount++;
+            }
           } else if (result.startsWith('error:')) {
             errorCount++;
           }
@@ -388,15 +288,15 @@ class ExportImportService {
 
       final messages = <String>[];
 
-      if (successCount > 0) {
+      if (importedCount > 0) {
         messages.add(
-          'Imported $successCount group${successCount > 1 ? 's' : ''}',
+          'Imported $importedCount new group${importedCount > 1 ? 's' : ''}',
         );
       }
 
-      if (skippedCount > 0) {
+      if (updatedCount > 0) {
         messages.add(
-          'Skipped $skippedCount duplicate${skippedCount > 1 ? 's' : ''}',
+          'Updated $updatedCount existing group${updatedCount > 1 ? 's' : ''}',
         );
       }
 

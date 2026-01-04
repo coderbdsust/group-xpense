@@ -175,22 +175,20 @@ class DatabaseHelper {
     final db = await database;
 
     await db.transaction((txn) async {
-      await txn.insert('groups', {
-        'id': group.id,
-        'name': group.name,
-        'description': group.description,
-        'createdAt': group.createdAt.toIso8601String(),
-      });
+      await txn.insert(
+        'groups',
+        {
+          'id': group.id,
+          'name': group.name,
+          'description': group.description,
+          'createdAt': group.createdAt.toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
-      // Insert group members
+      // Insert or update group members using upsert
       for (var member in group.members) {
-        await txn.insert('persons', {
-          'id': member.id,
-          'name': member.name,
-          'email': member.email,
-          'avatar': member.avatar,
-          'groupId': group.id,
-        });
+        await _upsertPerson(txn, member, group.id);
       }
     });
   }
@@ -206,17 +204,11 @@ class DatabaseHelper {
         whereArgs: [group.id],
       );
 
-      // Delete existing members and re-insert
+      // Delete existing members for this group and re-insert
       await txn.delete('persons', where: 'groupId = ?', whereArgs: [group.id]);
 
       for (var member in group.members) {
-        await txn.insert('persons', {
-          'id': member.id,
-          'name': member.name,
-          'email': member.email,
-          'avatar': member.avatar,
-          'groupId': group.id,
-        });
+        await _upsertPerson(txn, member, group.id);
       }
     });
   }
@@ -302,15 +294,51 @@ class DatabaseHelper {
     // Cascading deletes will handle persons, expenses, etc.
   }
 
+  // Helper method to insert or update person (upsert)
+  // Can accept both Database and Transaction (using DatabaseExecutor interface)
+  Future<void> _upsertPerson(
+    DatabaseExecutor db,
+    Person person,
+    String groupId,
+  ) async {
+    final existing = await db.query(
+      'persons',
+      where: 'id = ? AND groupId = ?',
+      whereArgs: [person.id, groupId],
+      limit: 1,
+    );
+
+    if (existing.isEmpty) {
+      // Person doesn't exist for this group, insert
+      await db.insert(
+        'persons',
+        {
+          'id': person.id,
+          'name': person.name,
+          'email': person.email,
+          'avatar': person.avatar,
+          'groupId': groupId,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    } else {
+      // Person exists for this group, update their info
+      await db.update(
+        'persons',
+        {
+          'name': person.name,
+          'email': person.email,
+          'avatar': person.avatar,
+        },
+        where: 'id = ? AND groupId = ?',
+        whereArgs: [person.id, groupId],
+      );
+    }
+  }
+
   Future<void> addMemberToGroup(String groupId, Person person) async {
     final db = await database;
-    await db.insert('persons', {
-      'id': person.id,
-      'name': person.name,
-      'email': person.email,
-      'avatar': person.avatar,
-      'groupId': groupId,
-    });
+    await _upsertPerson(db, person, groupId);
   }
 
   Future<void> removeMemberFromGroup(String groupId, String personId) async {
@@ -327,44 +355,77 @@ class DatabaseHelper {
     final db = await database;
 
     await db.transaction((txn) async {
-      await txn.insert('expenses', {
-        'id': expense.id,
-        'groupId': expense.groupId,
-        'description': expense.description,
-        'amount': expense.amount,
-        'paidById': expense.payers.isNotEmpty
-            ? expense.payers.first.person.id
-            : '',
-        'date': expense.date.toIso8601String(),
-        'category': expense.category,
-        'notes': expense.notes,
-        'isSettlement': expense.isSettlement ? 1 : 0,
-      });
+      await txn.insert(
+        'expenses',
+        {
+          'id': expense.id,
+          'groupId': expense.groupId,
+          'description': expense.description,
+          'amount': expense.amount,
+          'paidById': expense.payers.isNotEmpty
+              ? expense.payers.first.person.id
+              : '',
+          'date': expense.date.toIso8601String(),
+          'category': expense.category,
+          'notes': expense.notes,
+          'isSettlement': expense.isSettlement ? 1 : 0,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      // Delete existing related records first to avoid duplicates
+      await txn.delete(
+        'expense_payers',
+        where: 'expenseId = ?',
+        whereArgs: [expense.id],
+      );
+      await txn.delete(
+        'expense_participants',
+        where: 'expenseId = ?',
+        whereArgs: [expense.id],
+      );
+      await txn.delete(
+        'expense_splits',
+        where: 'expenseId = ?',
+        whereArgs: [expense.id],
+      );
 
       // Insert payers (multiple payers support)
       for (var payer in expense.payers) {
-        await txn.insert('expense_payers', {
-          'expenseId': expense.id,
-          'personId': payer.person.id,
-          'amount': payer.amount,
-        });
+        await txn.insert(
+          'expense_payers',
+          {
+            'expenseId': expense.id,
+            'personId': payer.person.id,
+            'amount': payer.amount,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
 
       // Insert participants
       for (var participant in expense.participants) {
-        await txn.insert('expense_participants', {
-          'expenseId': expense.id,
-          'personId': participant.id,
-        });
+        await txn.insert(
+          'expense_participants',
+          {
+            'expenseId': expense.id,
+            'personId': participant.id,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
 
       // Insert splits
       for (var entry in expense.splits.entries) {
-        await txn.insert('expense_splits', {
-          'expenseId': expense.id,
-          'personId': entry.key,
-          'amount': entry.value,
-        });
+        await txn.insert(
+          'expense_splits',
+          {
+            'expenseId': expense.id,
+            'personId': entry.key,
+            'amount': entry.value,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
     });
   }

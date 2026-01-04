@@ -1,5 +1,6 @@
 // lib/models/settlement.dart
 
+import 'dart:convert';
 import 'person.dart';
 
 class Settlement {
@@ -21,7 +22,33 @@ class Settlement {
     this.notes,
   });
 
+  // For database storage (with JSON-encoded strings)
   Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'groupId': groupId,
+      'from': jsonEncode(from.toMap()),
+      'to': jsonEncode(to.toMap()),
+      'amount': amount,
+      'date': date.toIso8601String(),
+      'notes': notes,
+    };
+  }
+
+  factory Settlement.fromMap(Map<String, dynamic> map) {
+    return Settlement(
+      id: map['id'] as String,
+      groupId: map['groupId'] as String,
+      from: Person.fromMap(jsonDecode(map['from']) as Map<String, dynamic>),
+      to: Person.fromMap(jsonDecode(map['to']) as Map<String, dynamic>),
+      amount: (map['amount'] as num).toDouble(),
+      date: DateTime.parse(map['date'] as String),
+      notes: map['notes'] as String?,
+    );
+  }
+
+  // For JSON export/import (with plain objects)
+  Map<String, dynamic> toJson() {
     return {
       'id': id,
       'groupId': groupId,
@@ -33,15 +60,15 @@ class Settlement {
     };
   }
 
-  factory Settlement.fromMap(Map<String, dynamic> map) {
+  factory Settlement.fromJson(Map<String, dynamic> json) {
     return Settlement(
-      id: map['id'],
-      groupId: map['groupId'],
-      from: Person.fromMap(map['from']),
-      to: Person.fromMap(map['to']),
-      amount: map['amount'],
-      date: DateTime.parse(map['date']),
-      notes: map['notes'],
+      id: json['id'] as String,
+      groupId: json['groupId'] as String,
+      from: Person.fromMap(json['from'] as Map<String, dynamic>),
+      to: Person.fromMap(json['to'] as Map<String, dynamic>),
+      amount: (json['amount'] as num).toDouble(),
+      date: DateTime.parse(json['date'] as String),
+      notes: json['notes'] as String?,
     );
   }
 }

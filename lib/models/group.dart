@@ -40,6 +40,29 @@ class Group {
     );
   }
 
+  // For JSON export/import (with plain objects, not JSON-encoded strings)
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'members': members.map((m) => m.toJson()).toList(),
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+
+  factory Group.fromJson(Map<String, dynamic> json) {
+    return Group(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      members: (json['members'] as List)
+          .map((m) => Person.fromJson(m as Map<String, dynamic>))
+          .toList(),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
+  }
+
   Group copyWith({
     String? id,
     String? name,
