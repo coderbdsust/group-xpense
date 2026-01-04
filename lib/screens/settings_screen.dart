@@ -6,6 +6,8 @@ import '../services/biometric_service.dart';
 import '../utils/privacy_policy.dart';
 import 'privacy_policy_screen.dart';
 import 'export_import_screen.dart';
+import '../utils/app_constants.dart';
+
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -244,6 +246,8 @@ class _CurrencySection extends StatelessWidget {
 }
 
 class _AboutSection extends StatelessWidget {
+  const _AboutSection();
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -262,17 +266,37 @@ class _AboutSection extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.info_outline, color: Colors.teal),
           title: const Text('Version'),
-          subtitle: const Text('1.0.0'),
+          subtitle: Text(AppConstants.fullVersion),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.teal[50],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'v${AppConstants.appVersion}',
+              style: const TextStyle(
+                color: Colors.teal,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
         ),
         ListTile(
-          leading: const Icon(Icons.code, color: Colors.teal),
+          leading: const Icon(Icons.person_outline, color: Colors.teal),
           title: const Text('Developer'),
-          subtitle: const Text('Biswajit Debnath'),
+          subtitle: Text(AppConstants.developerName),
         ),
         ListTile(
-          leading: const Icon(Icons.privacy_tip, color: Colors.teal),
+          leading: const Icon(Icons.calendar_today, color: Colors.teal),
+          title: const Text('Release Date'),
+          subtitle: Text(AppConstants.releaseDate),
+        ),
+        ListTile(
+          leading: const Icon(Icons.privacy_tip_outlined, color: Colors.teal),
           title: const Text('Privacy Policy'),
-          subtitle: Text('Version ${PrivacyPolicy.version}'),
+          subtitle: Text('Version ${AppConstants.privacyPolicyVersion}'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
             Navigator.push(
@@ -283,10 +307,75 @@ class _AboutSection extends StatelessWidget {
             );
           },
         ),
-        ListTile(
-          leading: const Icon(Icons.security, color: Colors.teal),
-          title: const Text('Privacy'),
-          subtitle: const Text('All data stored locally on your device'),
+        const Divider(height: 32),
+
+        // App Info Card
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Card(
+            color: Colors.teal[50],
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.apps, color: Colors.teal[700]),
+                      const SizedBox(width: 8),
+                      Text(
+                        AppConstants.appName,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal[900],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Split expenses with friends and groups easily. Track who owes what and settle up!',
+                    style: TextStyle(
+                      color: Colors.grey[700],
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.teal,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'v${AppConstants.appVersion}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        AppConstants.releaseDate,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );

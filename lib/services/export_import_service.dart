@@ -9,6 +9,7 @@ import '../models/group.dart';
 import '../models/person.dart';
 import '../models/expense.dart';
 import '../services/database_helper.dart';
+import '../utils/app_constants.dart';
 
 class ExportImportService {
   static final DatabaseHelper _db = DatabaseHelper.instance;
@@ -23,7 +24,7 @@ class ExportImportService {
     final expenses = await _db.getGroupExpenses(groupId);
 
     return {
-      'version': '2.0',
+      'version': AppConstants.appVersion,
       'exportDate': DateTime.now().toIso8601String(),
       'group': {
         'id': group.id,
@@ -38,8 +39,12 @@ class ExportImportService {
           'groupId': e.groupId,
           'description': e.description,
           'amount': e.amount,
+          // Multi-payer support only
           'payers': e.payers.map((payer) {
-            return {'person': payer.person.toMap(), 'amount': payer.amount};
+            return {
+              'person': payer.person.toMap(),
+              'amount': payer.amount,
+            };
           }).toList(),
           'participants': e.participants.map((p) => p.toMap()).toList(),
           'splits': e.splits,
@@ -63,9 +68,9 @@ class ExportImportService {
     }
 
     return {
-      'version': '2.0',
+      'version': AppConstants.appVersion,
       'exportDate': DateTime.now().toIso8601String(),
-      'appName': 'Group Xpense',
+      'appName': AppConstants.appName,
       'totalGroups': groups.length,
       'groups': allGroupsData,
     };
@@ -85,9 +90,9 @@ class ExportImportService {
 
   // Save JSON to local file system
   static Future<File> saveToLocalFileSystem(
-    Map<String, dynamic> data,
-    String fileName,
-  ) async {
+      Map<String, dynamic> data,
+      String fileName,
+      ) async {
     final exportDir = await getExportDirectory();
     final file = File('${exportDir.path}/$fileName');
 
@@ -99,9 +104,9 @@ class ExportImportService {
 
   // Export single group to local file system
   static Future<File> exportGroupToFile(
-    String groupId,
-    String groupName,
-  ) async {
+      String groupId,
+      String groupName,
+      ) async {
     final data = await exportGroupToJson(groupId);
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final fileName = '${groupName.replaceAll(' ', '_')}_$timestamp.json';
@@ -124,8 +129,8 @@ class ExportImportService {
 
     await Share.shareXFiles(
       [XFile(file.path)],
-      subject: 'Group Xpense - $groupName',
-      text: 'Export from Group Xpense app',
+      subject: '${AppConstants.appName} - $groupName',
+      text: 'Export from ${AppConstants.appName} app',
     );
   }
 
@@ -135,8 +140,8 @@ class ExportImportService {
 
     await Share.shareXFiles(
       [XFile(file.path)],
-      subject: 'Group Xpense - Complete Backup',
-      text: 'Complete backup from Group Xpense app',
+      subject: '${AppConstants.appName} - Complete Backup',
+      text: 'Complete backup from ${AppConstants.appName} app',
     );
   }
 
@@ -155,7 +160,7 @@ class ExportImportService {
         .toList();
 
     files.sort(
-      (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+          (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
     );
 
     return files;
@@ -203,13 +208,14 @@ class ExportImportService {
     }
   }
 
-  // Import group from JSON - returns result message
+  // Import group from JSON - Multi-payer only
   static Future<String> importGroupFromJson(Map<String, dynamic> data) async {
     try {
-      // Support both version 1.0 and 2.0
       final version = data['version'] as String;
-      if (version != '1.0' && version != '2.0') {
-        throw Exception('Unsupported backup version: $version');
+      if (version != AppConstants.appVersion) {
+        throw Exception(
+          'Unsupported backup version: $version. Please use ${AppConstants.appName} v$version to import this backup.',
+        );
       }
 
       final groupData = data['group'] as Map<String, dynamic>;
@@ -245,7 +251,7 @@ class ExportImportService {
 
       await _db.insertGroup(group);
 
-      // Import expenses
+      // Import expenses with multi-payer support
       int successCount = 0;
       int skipCount = 0;
 
@@ -253,49 +259,39 @@ class ExportImportService {
         try {
           final expenseMap = expenseData as Map<String, dynamic>;
 
-          // Parse payers (support both v1.0 and v2.0)
-          List<PayerShare> payers = [];
+          // Parse multi-payers (required field)
+          if (!expenseMap.containsKey('payers')) {
+            print('Skipped expense: Missing payers field');
+            skipCount++;
+            continue;
+          }
 
-          if (version == '2.0' && expenseMap.containsKey('payers')) {
-            // Version 2.0: Multiple payers
-            final payersData = expenseMap['payers'] as List;
-            payers = payersData.map((payerData) {
-              final payerMap = payerData as Map<String, dynamic>;
-              final personMap = payerMap['person'] as Map<String, dynamic>;
+          final payersData = expenseMap['payers'] as List;
+          final payers = payersData.map((payerData) {
+            final payerMap = payerData as Map<String, dynamic>;
+            final personMap = payerMap['person'] as Map<String, dynamic>;
 
-              final person = members.firstWhere(
-                (m) => m.id == personMap['id'],
-                orElse: () => Person(
-                  id: personMap['id'] as String,
-                  name: personMap['name'] as String,
-                  email: personMap['email'] as String?,
-                  avatar: personMap['avatar'] as String?,
-                ),
-              );
-
-              return PayerShare(
-                person: person,
-                amount: (payerMap['amount'] as num).toDouble(),
-              );
-            }).toList();
-          } else if (expenseMap.containsKey('paidBy')) {
-            // Version 1.0: Single payer (backward compatibility)
-            final paidByMap = expenseMap['paidBy'] as Map<String, dynamic>;
-            final paidBy = members.firstWhere(
-              (m) => m.id == paidByMap['id'],
+            final person = members.firstWhere(
+                  (m) => m.id == personMap['id'],
               orElse: () => Person(
-                id: paidByMap['id'] as String,
-                name: paidByMap['name'] as String,
-                email: paidByMap['email'] as String?,
-                avatar: paidByMap['avatar'] as String?,
+                id: personMap['id'] as String,
+                name: personMap['name'] as String,
+                email: personMap['email'] as String?,
+                avatar: personMap['avatar'] as String?,
               ),
             );
-            payers = [
-              PayerShare(
-                person: paidBy,
-                amount: (expenseMap['amount'] as num).toDouble(),
-              ),
-            ];
+
+            return PayerShare(
+              person: person,
+              amount: (payerMap['amount'] as num).toDouble(),
+            );
+          }).toList();
+
+          // Validate payers
+          if (payers.isEmpty) {
+            print('Skipped expense: No payers found');
+            skipCount++;
+            continue;
           }
 
           // Parse participants
@@ -303,7 +299,7 @@ class ExportImportService {
           final participants = participantsData.map((p) {
             final pMap = p as Map<String, dynamic>;
             return members.firstWhere(
-              (m) => m.id == pMap['id'],
+                  (m) => m.id == pMap['id'],
               orElse: () => Person(
                 id: pMap['id'] as String,
                 name: pMap['name'] as String,
@@ -356,12 +352,14 @@ class ExportImportService {
 
   // Import all groups from JSON with skip/count logic
   static Future<String> importAllGroupsFromJson(
-    Map<String, dynamic> data,
-  ) async {
+      Map<String, dynamic> data,
+      ) async {
     try {
       final version = data['version'] as String;
-      if (version != '1.0' && version != '2.0') {
-        throw Exception('Unsupported backup version: $version');
+      if (version != AppConstants.appVersion) {
+        throw Exception(
+          'Unsupported backup version: $version. Please use ${AppConstants.appName} v$version to import this backup.',
+        );
       }
 
       final groupsData = data['groups'] as List;
@@ -440,16 +438,16 @@ class ExportImportService {
   }
 
   static Future<Map<String, dynamic>?> readAndValidateJson(
-    String filePath,
-  ) async {
+      String filePath,
+      ) async {
     try {
       final file = File(filePath);
       final jsonString = await file.readAsString();
       final data = json.decode(jsonString) as Map<String, dynamic>;
 
       final version = data['version'] as String?;
-      if (version != '1.0' && version != '2.0') {
-        print('Invalid version: $version');
+      if (version != AppConstants.appVersion) {
+        print('Invalid version: $version (expected ${AppConstants.appVersion})');
         return null;
       }
 
@@ -499,7 +497,7 @@ class ExportImportService {
     final preview = await readAndValidateJson(file.path);
     if (preview == null) {
       throw Exception(
-        'Invalid backup file. Please select a valid Group Xpense backup JSON file.',
+        'Invalid backup file. Please select a valid ${AppConstants.appName} v${AppConstants.appVersion} backup JSON file.',
       );
     }
 
@@ -593,16 +591,14 @@ class ExportImportService {
           return expenseMap['isSettlement'] == true;
         });
 
-        final hasMultiPayers =
-            version == '2.0' &&
-            expensesData.any((e) {
-              final expenseMap = e as Map<String, dynamic>;
-              if (expenseMap.containsKey('payers')) {
-                final payers = expenseMap['payers'] as List;
-                return payers.length > 1;
-              }
-              return false;
-            });
+        final hasMultiPayers = expensesData.any((e) {
+          final expenseMap = e as Map<String, dynamic>;
+          if (expenseMap.containsKey('payers')) {
+            final payers = expenseMap['payers'] as List;
+            return payers.length > 1;
+          }
+          return false;
+        });
 
         return {
           'type': 'single_group',

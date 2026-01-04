@@ -1,5 +1,6 @@
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter/services.dart';
+import '../utils/app_constants.dart';
 
 class BiometricService {
   static final LocalAuthentication _auth = LocalAuthentication();
@@ -25,7 +26,7 @@ class BiometricService {
   }
 
   static Future<bool> authenticate({
-    String reason = 'Please authenticate to access Group Xpense',
+    String reason = 'Please authenticate to access ${AppConstants.appName}',
   }) async {
     try {
       final isAvailable = await BiometricService.isAvailable();

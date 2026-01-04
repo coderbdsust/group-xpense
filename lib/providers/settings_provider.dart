@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/app_settings.dart';
 import '../services/biometric_service.dart';
+import '../utils/app_constants.dart';
 
 class SettingsProvider extends ChangeNotifier {
   AppSettings _settings = AppSettings();
@@ -39,7 +40,7 @@ class SettingsProvider extends ChangeNotifier {
       }
 
       final authenticated = await BiometricService.authenticate(
-        reason: 'Enable biometric authentication for Group Xpense',
+        reason: 'Enable biometric authentication for ${AppConstants.appName}',
       );
 
       if (!authenticated) {

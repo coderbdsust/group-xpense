@@ -1,17 +1,17 @@
+import 'app_constants.dart';
+
 class PrivacyPolicy {
-  static const String version = "1.0";
-  static const String lastUpdated = "January 2025";
 
   static const String content =
       '''
-# Privacy Policy for Group Xpense
+# Privacy Policy for ${AppConstants.appName}
 
-**Last Updated: $lastUpdated**
-**Version: $version**
+**Last Updated: ${AppConstants.releaseDate}**
+**Version: ${AppConstants.privacyPolicyVersion}**
 
-## Introduction
+## Introduction 
 
-Welcome to Group Xpense ("we," "our," or "us"). We are committed to protecting your privacy and ensuring you have a positive experience while using our application. This Privacy Policy explains how we collect, use, and protect your information.
+Welcome to ${AppConstants.appName} ("we," "our," or "us"). We are committed to protecting your privacy and ensuring you have a positive experience while using our application. This Privacy Policy explains how we collect, use, and protect your information.
 
 ## Information We Collect
 
@@ -74,7 +74,7 @@ We **do not**:
 
 ## Children's Privacy
 
-Group Xpense does not knowingly collect data from children under 13. The app is designed for general use and does not target children. If you are a parent or guardian and believe your child has provided us with information, please contact us.
+${AppConstants.appName} does not knowingly collect data from children under 13. The app is designed for general use and does not target children. If you are a parent or guardian and believe your child has provided us with information, please contact us.
 
 ## Your Rights
 
@@ -109,7 +109,7 @@ Continued use of the app after changes constitutes acceptance of the updated Pri
 
 ## Third-Party Services
 
-Group Xpense uses the following device services:
+${AppConstants.appName} uses the following device services:
 - **Local Authentication** (Android/iOS): For biometric authentication
 - **SQLite Database** (local storage): For data persistence
 - **Shared Preferences** (local storage): For app settings
@@ -132,8 +132,8 @@ None of these services transmit data externally.
 
 If you have questions about this Privacy Policy or our privacy practices:
 
-**Email**: biswajit.sust@gmail.com  
-**Website**: https://group-expense.firebaseapp.com  
+**Email**: ${AppConstants.developerEmail}  
+**Website**: ${AppConstants.appWebsite}  
 **Response Time**: Within 48 hours
 
 ## Compliance
@@ -146,7 +146,7 @@ This Privacy Policy complies with:
 
 ## User Consent
 
-By using Group Xpense, you consent to:
+By using ${AppConstants.appName}, you consent to:
 - Collection of data as described in this policy
 - Local storage of your data
 - Use of biometric authentication (if you enable it)
@@ -158,7 +158,7 @@ You can withdraw consent by:
 
 ## Open Source
 
-Group Xpense is built with Flutter and uses open-source libraries. For transparency:
+${AppConstants.appName} is built with Flutter and uses open-source libraries. For transparency:
 - No proprietary tracking code
 - No hidden data collection
 - No backdoors or unauthorized access
@@ -184,6 +184,6 @@ Group Xpense is built with Flutter and uses open-source libraries. For transpare
 
 **Effective Date**: January 1, 2025
 
-Thank you for trusting Group Xpense with your expense tracking needs!
+Thank you for trusting ${AppConstants.appName} with your expense tracking needs!
 ''';
 }

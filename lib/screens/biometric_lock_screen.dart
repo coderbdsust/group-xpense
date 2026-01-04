@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/biometric_service.dart';
 import 'home_screen.dart';
+import '../utils/app_constants.dart';
 
 class BiometricLockScreen extends StatefulWidget {
   const BiometricLockScreen({super.key});
@@ -80,7 +81,7 @@ class _BiometricLockScreenState extends State<BiometricLockScreen>
 
       // Attempt authentication
       final authenticated = await BiometricService.authenticate(
-        reason: 'Authenticate to access Group Xpense',
+        reason: 'Authenticate to access ${AppConstants.appName}',
       );
 
       if (authenticated && mounted) {
@@ -152,7 +153,7 @@ class _BiometricLockScreenState extends State<BiometricLockScreen>
               ),
               const SizedBox(height: 32),
               Text(
-                'Group Xpense',
+                AppConstants.appName,
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:group_xpense/utils/app_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/privacy_policy.dart';
 import 'privacy_policy_screen.dart';
@@ -47,7 +48,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
 
               // App Name
               const Text(
-                'Welcome to Group Xpense',
+                'Welcome to ${AppConstants.appName}',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -196,7 +197,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
 
               // Version info
               Text(
-                'Privacy Policy Version ${PrivacyPolicy.version}',
+                'Privacy Policy Version ${AppConstants.privacyPolicyVersion}',
                 style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
             ],
@@ -209,7 +210,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
   Future<void> _acceptAndContinue() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('privacy_accepted', true);
-    await prefs.setString('privacy_version', PrivacyPolicy.version);
+    await prefs.setString('privacy_version', AppConstants.privacyPolicyVersion);
     await prefs.setString(
       'privacy_accepted_date',
       DateTime.now().toIso8601String(),

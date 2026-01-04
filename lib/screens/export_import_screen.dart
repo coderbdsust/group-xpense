@@ -6,6 +6,7 @@ import '../services/export_import_service.dart';
 import '../providers/expense_provider.dart';
 import '../models/group.dart';
 import 'package:share_plus/share_plus.dart';
+import '../utils/app_constants.dart';
 
 class ExportImportScreen extends StatefulWidget {
   const ExportImportScreen({super.key});
@@ -599,7 +600,7 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Invalid backup file. Please select a valid Group Xpense backup.',
+              'Invalid backup file. Please select a valid ${AppConstants.appName} backup.',
             ),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 4),
@@ -968,8 +969,8 @@ class _ExportImportScreenState extends State<ExportImportScreen> {
     try {
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'Group Xpense Backup',
-        text: 'Backup file from Group Xpense app',
+        subject: '${AppConstants.appName} Backup',
+        text: 'Backup file from ${AppConstants.appName} app',
       );
     } catch (e) {
       if (context.mounted) {
