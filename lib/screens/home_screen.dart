@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:group_xpense/models/app_settings.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
 import '../models/group.dart';
 import 'create_group_screen.dart';

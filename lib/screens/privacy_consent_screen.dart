@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:group_xpense/utils/app_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/privacy_policy.dart';
 import 'privacy_policy_screen.dart';
 import 'home_screen.dart';
 
