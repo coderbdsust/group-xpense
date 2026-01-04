@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
 import '../models/group.dart';
 import 'create_group_screen.dart';
@@ -58,57 +59,119 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('About Group Xpense'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Group Xpense',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text('Version 2.1.0'),
+            SizedBox(height: 16),
+            Text(
+              'Split expenses with friends and groups easily.\n'
+                  'Track who owes what and settle up!',
+              style: TextStyle(height: 1.5),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Group Xpense'),
         actions: [
-          IconButton(
-            icon: _isRefreshing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.refresh),
-            onPressed: _isRefreshing ? null : _refreshGroups,
-            tooltip: 'Refresh',
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('About'),
-                  content: const Text(
-                    'Group Xpense\n\n'
-                    'Split expenses with friends and groups easily.\n'
-                    'Track who owes what and settle up!',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
+          if (_isRefreshing)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
                 ),
-              );
-            },
-          ),
+              ),
+            )
+          else
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.white),
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              onSelected: (value) {
+                switch (value) {
+                  case 'refresh':
+                    _refreshGroups();
+                    break;
+                  case 'settings':
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsScreen(),
+                      ),
+                    );
+                    break;
+                  case 'about':
+                    _showAboutDialog();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'refresh',
+                  child: Row(
+                    children: [
+                      Icon(Icons.refresh, color: Colors.teal, size: 20),
+                      SizedBox(width: 12),
+                      Text('Refresh Groups'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'settings',
+                  child: Row(
+                    children: [
+                      Icon(Icons.settings, color: Colors.teal, size: 20),
+                      SizedBox(width: 12),
+                      Text('Settings'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'about',
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.teal, size: 20),
+                      SizedBox(width: 12),
+                      Text('About'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
       body: RefreshIndicator(
@@ -124,16 +187,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.group_add,
-                          size: 100,
-                          color: Colors.teal[200],
-                        ),
+                        Icon(Icons.group_add, size: 100, color: Colors.teal[200]),
                         const SizedBox(height: 24),
                         Text(
                           'No groups yet',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(color: Colors.grey[700]),
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: Colors.grey[700],
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -279,10 +339,7 @@ class _GroupCard extends StatelessWidget {
                           children: [
                             Icon(Icons.delete, color: Colors.red, size: 20),
                             SizedBox(width: 12),
-                            Text(
-                              'Delete Group',
-                              style: TextStyle(color: Colors.red),
-                            ),
+                            Text('Delete Group', style: TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
@@ -381,10 +438,7 @@ class _GroupCard extends StatelessWidget {
                   backgroundColor: Color(0xFFFFEBEE),
                   child: Icon(Icons.delete, color: Colors.red),
                 ),
-                title: const Text(
-                  'Delete Group',
-                  style: TextStyle(color: Colors.red),
-                ),
+                title: const Text('Delete Group', style: TextStyle(color: Colors.red)),
                 subtitle: const Text('Remove group and all expenses'),
                 onTap: () {
                   Navigator.pop(context);
@@ -401,7 +455,9 @@ class _GroupCard extends StatelessWidget {
   void _editGroup(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => EditGroupScreen(group: group)),
+      MaterialPageRoute(
+        builder: (context) => EditGroupScreen(group: group),
+      ),
     );
   }
 
@@ -425,16 +481,15 @@ class _GroupCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.warning_amber,
-                    color: Colors.orange[700],
-                    size: 20,
-                  ),
+                  Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'All expenses will be permanently deleted',
-                      style: TextStyle(color: Colors.orange[900], fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.orange[900],
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
@@ -450,10 +505,8 @@ class _GroupCard extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              await Provider.of<ExpenseProvider>(
-                context,
-                listen: false,
-              ).deleteGroup(group.id);
+              await Provider.of<ExpenseProvider>(context, listen: false)
+                  .deleteGroup(group.id);
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(

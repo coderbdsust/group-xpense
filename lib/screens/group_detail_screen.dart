@@ -22,10 +22,15 @@ class GroupDetailScreen extends StatefulWidget {
   State<GroupDetailScreen> createState() => _GroupDetailScreenState();
 }
 
-class _GroupDetailScreenState extends State<GroupDetailScreen> {
+class _GroupDetailScreenState extends State<GroupDetailScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 5, vsync: this);
+
     // Force refresh when screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ExpenseProvider>(context, listen: false).refreshGroups();
@@ -33,85 +38,96 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _navigateToTab(int index) {
+    if (index == 3) {
+      // Settle Up tab - navigate to screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SettleUpScreen(group: widget.group),
+        ),
+      ).then((_) {
+        setState(() {});
+      });
+      // Reset to previous tab
+      _tabController.index = _tabController.previousIndex;
+    } else if (index == 4) {
+      // Reports tab - navigate to screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ReportsScreen(group: widget.group),
+        ),
+      );
+      // Reset to previous tab
+      _tabController.index = _tabController.previousIndex;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.group.name),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.handshake),
-              tooltip: 'Settle Up',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SettleUpScreen(group: widget.group),
-                  ),
-                ).then((_) {
-                  // Refresh when returning from settle up
-                  setState(() {});
-                });
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EditGroupScreen(group: widget.group),
-                  ),
-                ).then((_) {
-                  // Refresh when returning from edit
-                  setState(() {});
-                });
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.assessment),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ReportsScreen(group: widget.group),
-                  ),
-                );
-              },
-            ),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.receipt_long), text: 'Expenses'),
-              Tab(icon: Icon(Icons.account_balance_wallet), text: 'Balances'),
-              Tab(icon: Icon(Icons.people), text: 'Members'),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.group.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            tooltip: 'Edit Group',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EditGroupScreen(group: widget.group),
+                ),
+              ).then((_) {
+                setState(() {});
+              });
+            },
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _ExpensesTab(group: widget.group),
-            _BalancesTab(group: widget.group),
-            _MembersTab(group: widget.group),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          onTap: _navigateToTab,
+          tabs: const [
+            Tab(icon: Icon(Icons.receipt_long), text: 'Expenses'),
+            Tab(icon: Icon(Icons.account_balance_wallet), text: 'Balances'),
+            Tab(icon: Icon(Icons.people), text: 'Members'),
+            Tab(icon: Icon(Icons.handshake), text: 'Settle Up'),
+            Tab(icon: Icon(Icons.assessment), text: 'Reports'),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    AddExpenseMultiPayerScreen(group: widget.group),
-              ),
-            ).then((_) {
-              // Refresh when returning from add expense
-              setState(() {});
-            });
-          },
-          icon: const Icon(Icons.add),
-          label: const Text('Add Expense'),
-        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        physics:
+            const NeverScrollableScrollPhysics(), // Disable swipe for last two tabs
+        children: [
+          _ExpensesTab(group: widget.group),
+          _BalancesTab(group: widget.group),
+          _MembersTab(group: widget.group),
+          Container(), // Placeholder for Settle Up
+          Container(), // Placeholder for Reports
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  AddExpenseMultiPayerScreen(group: widget.group),
+            ),
+          ).then((_) {
+            setState(() {});
+          });
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Add Expense'),
       ),
     );
   }
@@ -133,19 +149,17 @@ class _ExpensesTabState extends State<_ExpensesTab>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context);
 
     return Consumer<ExpenseProvider>(
       builder: (context, provider, child) {
         return FutureBuilder<List<Expense>>(
           future: provider.getGroupExpenses(widget.group.id),
           builder: (context, snapshot) {
-            // Show loading indicator
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            // Show error if something went wrong
             if (snapshot.hasError) {
               return Center(
                 child: Column(
@@ -166,7 +180,7 @@ class _ExpensesTabState extends State<_ExpensesTab>
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
-                        setState(() {}); // Retry
+                        setState(() {});
                       },
                       icon: const Icon(Icons.refresh),
                       label: const Text('Retry'),
@@ -176,7 +190,6 @@ class _ExpensesTabState extends State<_ExpensesTab>
               );
             }
 
-            // Show empty state if no expenses
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return Center(
                 child: Column(
@@ -202,11 +215,10 @@ class _ExpensesTabState extends State<_ExpensesTab>
               );
             }
 
-            // Show expenses list
             final expenses = snapshot.data!;
             return RefreshIndicator(
               onRefresh: () async {
-                setState(() {}); // Trigger rebuild
+                setState(() {});
                 await Future.delayed(const Duration(milliseconds: 300));
               },
               child: ListView.builder(
@@ -227,7 +239,6 @@ class _ExpensesTabState extends State<_ExpensesTab>
                           ),
                         ),
                       ).then((_) {
-                        // Refresh when returning from detail
                         setState(() {});
                       });
                     },
@@ -251,7 +262,6 @@ class _ExpenseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Determine if this is a settlement
     final isSettlement = expense.isSettlement;
     final displayIcon = isSettlement
         ? Icons.handshake
@@ -342,12 +352,10 @@ class _ExpenseCard extends StatelessWidget {
               const Divider(height: 20),
               Row(
                 children: [
-                  // Show multiple payers if applicable
                   if (expense.payers.isEmpty)
-                    // Fallback if no payers
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.error_outline,
                           size: 16,
                           color: Colors.orange,
@@ -515,7 +523,6 @@ class _BalancesTab extends StatelessWidget {
             snapshot.data![0] as Map<String, Map<String, double>>;
         final totalExpenses = snapshot.data![1] as double;
 
-        // Check if there are any actual settlements
         bool hasSettlements = false;
         for (var creditors in settlements.values) {
           for (var amount in creditors.values) {
@@ -529,7 +536,6 @@ class _BalancesTab extends StatelessWidget {
 
         return RefreshIndicator(
           onRefresh: () async {
-            // Clear cache and refresh
             final expenseProvider = Provider.of<ExpenseProvider>(
               context,
               listen: false,
@@ -590,29 +596,9 @@ class _BalancesTab extends StatelessWidget {
                   ),
                 ),
               ] else ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Who Owes Whom',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SettleUpScreen(group: group),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.handshake, size: 18),
-                      label: const Text('Settle Up'),
-                    ),
-                  ],
+                const Text(
+                  'Who Owes Whom',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
                 ...settlements.entries.expand((debtorEntry) {
