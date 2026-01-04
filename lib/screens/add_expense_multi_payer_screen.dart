@@ -399,53 +399,257 @@ class _AddExpenseMultiPayerScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Who Participated?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Select people who will share this expense',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: widget.group.members.map((member) {
-                final isSelected = _selectedParticipants.contains(member.id);
-                return FilterChip(
-                  label: Text(member.name),
-                  selected: isSelected,
-                  onSelected: (selected) {
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Who Participated?',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: () {
                     setState(() {
-                      if (selected) {
-                        _selectedParticipants.add(member.id);
+                      if (_selectedParticipants.length == widget.group.members.length) {
+                        _selectedParticipants.clear();
+                        _selectedParticipants.add(widget.group.members.first.id);
                       } else {
-                        if (_selectedParticipants.length > 1) {
-                          _selectedParticipants.remove(member.id);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'At least one participant required',
-                              ),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
-                        }
+                        _selectedParticipants.clear();
+                        _selectedParticipants.addAll(widget.group.members.map((m) => m.id));
                       }
                       _calculateEqualSplit();
                     });
                   },
-                  avatar: CircleAvatar(
-                    child: Text(member.name[0].toUpperCase()),
+                  icon: Icon(
+                    _selectedParticipants.length == widget.group.members.length
+                        ? Icons.deselect
+                        : Icons.done_all,
                   ),
-                );
-              }).toList(),
+                  tooltip: _selectedParticipants.length == widget.group.members.length
+                      ? 'Deselect All'
+                      : 'Select All',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap to select people who will share this expense',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+
+            // Grid of participant cards
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 2.5,
+              ),
+              itemCount: widget.group.members.length,
+              itemBuilder: (context, index) {
+                final member = widget.group.members[index];
+                return _buildParticipantCard(member);
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Summary
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.teal[50]!, Colors.teal[100]!],
+                ),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.teal[300]!),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people, color: Colors.teal[700], size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${_selectedParticipants.length} of ${widget.group.members.length} selected',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal[900],
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildParticipantCard(Person member) {
+    final isSelected = _selectedParticipants.contains(member.id);
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            if (_selectedParticipants.length > 1) {
+              _selectedParticipants.remove(member.id);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('At least one participant required'),
+                  backgroundColor: Colors.orange,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            }
+          } else {
+            _selectedParticipants.add(member.id);
+          }
+          _calculateEqualSplit();
+        });
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.teal : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.teal[700]! : Colors.grey[300]!,
+            width: 2,
+          ),
+          boxShadow: isSelected
+              ? [
+            BoxShadow(
+              color: Colors.teal.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ]
+              : null,
+        ),
+        child: Stack(
+          children: [
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: isSelected ? Colors.white : Colors.teal[100],
+                    child: Text(
+                      member.name[0].toUpperCase(),
+                      style: TextStyle(
+                        color: isSelected ? Colors.teal[700] : Colors.teal,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      member.name,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.grey[800],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: Colors.teal[700],
+                    size: 16,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+  Widget _buildParticipantTile(Person member) {
+    final isSelected = _selectedParticipants.contains(member.id);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.teal[50] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? Colors.teal : Colors.grey[300]!,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      child: CheckboxListTile(
+        value: isSelected,
+        onChanged: (selected) {
+          setState(() {
+            if (selected == true) {
+              _selectedParticipants.add(member.id);
+            } else {
+              if (_selectedParticipants.length > 1) {
+                _selectedParticipants.remove(member.id);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('At least one participant required'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            }
+            _calculateEqualSplit();
+          });
+        },
+        title: Text(
+          member.name,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? Colors.teal[900] : Colors.grey[800],
+          ),
+        ),
+        subtitle: isSelected
+            ? Text(
+          'Participating',
+          style: TextStyle(
+            color: Colors.teal[700],
+            fontSize: 12,
+          ),
+        )
+            : null,
+        secondary: CircleAvatar(
+          backgroundColor: isSelected ? Colors.teal : Colors.grey[400],
+          child: Text(
+            member.name[0].toUpperCase(),
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        activeColor: Colors.teal,
+        checkColor: Colors.white,
+        controlAffinity: ListTileControlAffinity.trailing,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
     );
   }
