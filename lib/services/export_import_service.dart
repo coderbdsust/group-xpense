@@ -1,3 +1,5 @@
+// lib/services/export_import_service.dart
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
@@ -21,53 +23,32 @@ class ExportImportService {
     final expenses = await _db.getGroupExpenses(groupId);
 
     return {
-      'version': '1.0',
+      'version': '2.0',
       'exportDate': DateTime.now().toIso8601String(),
       'group': {
         'id': group.id,
         'name': group.name,
         'description': group.description,
         'createdAt': group.createdAt.toIso8601String(),
-        'members': group.members
-            .map(
-              (m) => {
-            'id': m.id,
-            'name': m.name,
-            'email': m.email,
-            'avatar': m.avatar,
-          },
-        )
-            .toList(),
+        'members': group.members.map((m) => m.toMap()).toList(),
       },
-      'expenses': expenses
-          .map(
-            (e) => {
+      'expenses': expenses.map((e) {
+        return {
           'id': e.id,
           'groupId': e.groupId,
           'description': e.description,
           'amount': e.amount,
-          'paidBy': {
-            'id': e.paidBy.id,
-            'name': e.paidBy.name,
-            'email': e.paidBy.email,
-            'avatar': e.paidBy.avatar,
-          },
-          'participants': e.participants
-              .map(
-                (p) => {
-              'id': p.id,
-              'name': p.name,
-              'email': p.email,
-              'avatar': p.avatar,
-            },
-          )
-              .toList(),
+          'payers': e.payers.map((payer) {
+            return {'person': payer.person.toMap(), 'amount': payer.amount};
+          }).toList(),
+          'participants': e.participants.map((p) => p.toMap()).toList(),
           'splits': e.splits,
           'date': e.date.toIso8601String(),
           'category': e.category,
-        },
-      )
-          .toList(),
+          'notes': e.notes,
+          'isSettlement': e.isSettlement,
+        };
+      }).toList(),
     };
   }
 
@@ -82,7 +63,7 @@ class ExportImportService {
     }
 
     return {
-      'version': '1.0',
+      'version': '2.0',
       'exportDate': DateTime.now().toIso8601String(),
       'appName': 'Group Xpense',
       'totalGroups': groups.length,
@@ -104,9 +85,9 @@ class ExportImportService {
 
   // Save JSON to local file system
   static Future<File> saveToLocalFileSystem(
-      Map<String, dynamic> data,
-      String fileName,
-      ) async {
+    Map<String, dynamic> data,
+    String fileName,
+  ) async {
     final exportDir = await getExportDirectory();
     final file = File('${exportDir.path}/$fileName');
 
@@ -118,9 +99,9 @@ class ExportImportService {
 
   // Export single group to local file system
   static Future<File> exportGroupToFile(
-      String groupId,
-      String groupName,
-      ) async {
+    String groupId,
+    String groupName,
+  ) async {
     final data = await exportGroupToJson(groupId);
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final fileName = '${groupName.replaceAll(' ', '_')}_$timestamp.json';
@@ -137,7 +118,7 @@ class ExportImportService {
     return await saveToLocalFileSystem(data, fileName);
   }
 
-  // Export and share (keep for sharing functionality)
+  // Export and share
   static Future<void> shareGroupFile(String groupId, String groupName) async {
     final file = await exportGroupToFile(groupId, groupName);
 
@@ -173,9 +154,8 @@ class ExportImportService {
         .where((file) => file.path.endsWith('.json'))
         .toList();
 
-    // Sort by modification time (newest first)
     files.sort(
-          (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+      (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
     );
 
     return files;
@@ -205,159 +185,236 @@ class ExportImportService {
 
   // Import from file path with duplicate handling
   static Future<String> importFromFilePath(String filePath) async {
-    final file = File(filePath);
-    final jsonString = await file.readAsString();
-    final data = json.decode(jsonString);
+    try {
+      final file = File(filePath);
+      final jsonString = await file.readAsString();
+      final data = json.decode(jsonString) as Map<String, dynamic>;
 
-    if (data.containsKey('groups')) {
-      final result = await importAllGroupsFromJson(data);
-      return result;
-    } else if (data.containsKey('group')) {
-      final result = await importGroupFromJson(data);
-      return result;
-    } else {
-      throw Exception('Invalid backup file format');
+      if (data.containsKey('groups')) {
+        return await importAllGroupsFromJson(data);
+      } else if (data.containsKey('group')) {
+        return await importGroupFromJson(data);
+      } else {
+        throw Exception('Invalid backup file format');
+      }
+    } catch (e) {
+      print('Import error: $e');
+      throw Exception('Failed to import: ${e.toString()}');
     }
   }
 
   // Import group from JSON - returns result message
   static Future<String> importGroupFromJson(Map<String, dynamic> data) async {
-    if (data['version'] != '1.0') {
-      throw Exception('Unsupported backup version');
-    }
-
-    final groupData = data['group'];
-    final expensesData = data['expenses'] as List;
-
-    // Check if group already exists - SKIP if it does
-    final existingGroup = await _db.getGroup(groupData['id']);
-
-    if (existingGroup != null) {
-      // Silently skip this group
-      return 'skipped:${groupData['name']}';
-    }
-
     try {
+      // Support both version 1.0 and 2.0
+      final version = data['version'] as String;
+      if (version != '1.0' && version != '2.0') {
+        throw Exception('Unsupported backup version: $version');
+      }
+
+      final groupData = data['group'] as Map<String, dynamic>;
+      final expensesData = data['expenses'] as List;
+
+      // Check if group already exists - SKIP if it does
+      final existingGroup = await _db.getGroup(groupData['id'] as String);
+
+      if (existingGroup != null) {
+        return 'skipped:${groupData['name']}';
+      }
+
       // Parse members
-      final members = (groupData['members'] as List)
-          .map(
-            (m) => Person(
-          id: m['id'],
-          name: m['name'],
-          email: m['email'],
-          avatar: m['avatar'],
-        ),
-      )
-          .toList();
+      final membersData = groupData['members'] as List;
+      final members = membersData.map((m) {
+        final memberMap = m as Map<String, dynamic>;
+        return Person(
+          id: memberMap['id'] as String,
+          name: memberMap['name'] as String,
+          email: memberMap['email'] as String?,
+          avatar: memberMap['avatar'] as String?,
+        );
+      }).toList();
 
       // Create group
       final group = Group(
-        id: groupData['id'],
-        name: groupData['name'],
-        description: groupData['description'],
+        id: groupData['id'] as String,
+        name: groupData['name'] as String,
+        description: groupData['description'] as String?,
         members: members,
-        createdAt: DateTime.parse(groupData['createdAt']),
+        createdAt: DateTime.parse(groupData['createdAt'] as String),
       );
 
       await _db.insertGroup(group);
 
       // Import expenses
+      int successCount = 0;
+      int skipCount = 0;
+
       for (var expenseData in expensesData) {
         try {
-          final paidBy = members.firstWhere(
-                (m) => m.id == expenseData['paidBy']['id'],
-          );
+          final expenseMap = expenseData as Map<String, dynamic>;
 
-          final participantIds = (expenseData['participants'] as List)
-              .map((p) => p['id'] as String)
-              .toList();
-          final participants = members
-              .where((m) => participantIds.contains(m.id))
-              .toList();
+          // Parse payers (support both v1.0 and v2.0)
+          List<PayerShare> payers = [];
+
+          if (version == '2.0' && expenseMap.containsKey('payers')) {
+            // Version 2.0: Multiple payers
+            final payersData = expenseMap['payers'] as List;
+            payers = payersData.map((payerData) {
+              final payerMap = payerData as Map<String, dynamic>;
+              final personMap = payerMap['person'] as Map<String, dynamic>;
+
+              final person = members.firstWhere(
+                (m) => m.id == personMap['id'],
+                orElse: () => Person(
+                  id: personMap['id'] as String,
+                  name: personMap['name'] as String,
+                  email: personMap['email'] as String?,
+                  avatar: personMap['avatar'] as String?,
+                ),
+              );
+
+              return PayerShare(
+                person: person,
+                amount: (payerMap['amount'] as num).toDouble(),
+              );
+            }).toList();
+          } else if (expenseMap.containsKey('paidBy')) {
+            // Version 1.0: Single payer (backward compatibility)
+            final paidByMap = expenseMap['paidBy'] as Map<String, dynamic>;
+            final paidBy = members.firstWhere(
+              (m) => m.id == paidByMap['id'],
+              orElse: () => Person(
+                id: paidByMap['id'] as String,
+                name: paidByMap['name'] as String,
+                email: paidByMap['email'] as String?,
+                avatar: paidByMap['avatar'] as String?,
+              ),
+            );
+            payers = [
+              PayerShare(
+                person: paidBy,
+                amount: (expenseMap['amount'] as num).toDouble(),
+              ),
+            ];
+          }
+
+          // Parse participants
+          final participantsData = expenseMap['participants'] as List;
+          final participants = participantsData.map((p) {
+            final pMap = p as Map<String, dynamic>;
+            return members.firstWhere(
+              (m) => m.id == pMap['id'],
+              orElse: () => Person(
+                id: pMap['id'] as String,
+                name: pMap['name'] as String,
+                email: pMap['email'] as String?,
+                avatar: pMap['avatar'] as String?,
+              ),
+            );
+          }).toList();
+
+          // Parse splits
+          final splitsMap = expenseMap['splits'] as Map<String, dynamic>;
+          final splits = <String, double>{};
+          splitsMap.forEach((key, value) {
+            splits[key] = (value as num).toDouble();
+          });
 
           final expense = Expense(
-            id: expenseData['id'],
-            groupId: expenseData['groupId'],
-            description: expenseData['description'],
-            amount: (expenseData['amount'] as num).toDouble(),
-            paidBy: paidBy,
+            id: expenseMap['id'] as String,
+            groupId: expenseMap['groupId'] as String,
+            description: expenseMap['description'] as String,
+            amount: (expenseMap['amount'] as num).toDouble(),
+            payers: payers,
             participants: participants,
-            splits: Map<String, double>.from(expenseData['splits']),
-            date: DateTime.parse(expenseData['date']),
-            category: expenseData['category'],
+            splits: splits,
+            date: DateTime.parse(expenseMap['date'] as String),
+            category: expenseMap['category'] as String?,
+            notes: expenseMap['notes'] as String?,
+            isSettlement: expenseMap['isSettlement'] == true,
           );
 
           await _db.insertExpense(expense);
+          successCount++;
         } catch (e) {
-          // Skip individual expense if it fails (e.g., duplicate expense ID)
-          print('Skipped expense in ${groupData['name']}: $e');
+          print('Skipped expense: $e');
+          skipCount++;
           continue;
         }
       }
 
-      return 'success:${groupData['name']}';
+      if (successCount > 0) {
+        return 'success:${groupData['name']}';
+      } else {
+        return 'error:${groupData['name']}';
+      }
     } catch (e) {
-      // If group insert fails, return skip
-      print('Failed to import group ${groupData['name']}: $e');
-      return 'error:${groupData['name']}';
+      print('Failed to import group: $e');
+      return 'error:${data['group']?['name'] ?? 'Unknown'}';
     }
   }
 
   // Import all groups from JSON with skip/count logic
-  static Future<String> importAllGroupsFromJson(Map<String, dynamic> data) async {
-    if (data['version'] != '1.0') {
-      throw Exception('Unsupported backup version');
-    }
-
-    final groupsData = data['groups'] as List;
-    int successCount = 0;
-    int skippedCount = 0;
-    int errorCount = 0;
-    final skippedGroups = <String>[];
-    final errorGroups = <String>[];
-
-    for (var groupData in groupsData) {
-      try {
-        final result = await importGroupFromJson(groupData);
-
-        if (result.startsWith('success:')) {
-          successCount++;
-        } else if (result.startsWith('skipped:')) {
-          skippedCount++;
-          final groupName = result.substring('skipped:'.length);
-          skippedGroups.add(groupName);
-        } else if (result.startsWith('error:')) {
-          errorCount++;
-          final groupName = result.substring('error:'.length);
-          errorGroups.add(groupName);
-        }
-      } catch (e) {
-        errorCount++;
-        errorGroups.add(groupData['group']['name']);
-        print('Error importing group: $e');
+  static Future<String> importAllGroupsFromJson(
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final version = data['version'] as String;
+      if (version != '1.0' && version != '2.0') {
+        throw Exception('Unsupported backup version: $version');
       }
+
+      final groupsData = data['groups'] as List;
+      int successCount = 0;
+      int skippedCount = 0;
+      int errorCount = 0;
+
+      for (var groupData in groupsData) {
+        try {
+          final result = await importGroupFromJson(
+            groupData as Map<String, dynamic>,
+          );
+
+          if (result.startsWith('success:')) {
+            successCount++;
+          } else if (result.startsWith('skipped:')) {
+            skippedCount++;
+          } else if (result.startsWith('error:')) {
+            errorCount++;
+          }
+        } catch (e) {
+          print('Error importing group: $e');
+          errorCount++;
+        }
+      }
+
+      final messages = <String>[];
+
+      if (successCount > 0) {
+        messages.add(
+          'Imported $successCount group${successCount > 1 ? 's' : ''}',
+        );
+      }
+
+      if (skippedCount > 0) {
+        messages.add(
+          'Skipped $skippedCount duplicate${skippedCount > 1 ? 's' : ''}',
+        );
+      }
+
+      if (errorCount > 0) {
+        messages.add('$errorCount failed');
+      }
+
+      if (messages.isEmpty) {
+        return 'No groups were imported';
+      }
+
+      return messages.join('. ');
+    } catch (e) {
+      print('Import all groups error: $e');
+      throw Exception('Failed to import groups: ${e.toString()}');
     }
-
-    // Build result message
-    final messages = <String>[];
-
-    if (successCount > 0) {
-      messages.add('Imported $successCount group${successCount > 1 ? 's' : ''}');
-    }
-
-    if (skippedCount > 0) {
-      messages.add('Skipped $skippedCount duplicate${skippedCount > 1 ? 's' : ''}');
-    }
-
-    if (errorCount > 0) {
-      messages.add('$errorCount failed');
-    }
-
-    if (messages.isEmpty) {
-      return 'No groups were imported';
-    }
-
-    return messages.join('. ');
   }
 
   static Future<List<FileSystemEntity>> getJsonFilesFromDocuments() async {
@@ -383,20 +440,21 @@ class ExportImportService {
   }
 
   static Future<Map<String, dynamic>?> readAndValidateJson(
-      String filePath,
-      ) async {
+    String filePath,
+  ) async {
     try {
       final file = File(filePath);
       final jsonString = await file.readAsString();
-      final data = json.decode(jsonString);
+      final data = json.decode(jsonString) as Map<String, dynamic>;
 
-      // Validate structure
-      if (data['version'] != '1.0') {
+      final version = data['version'] as String?;
+      if (version != '1.0' && version != '2.0') {
+        print('Invalid version: $version');
         return null;
       }
 
-      // Check if it's a valid backup
       if (!data.containsKey('group') && !data.containsKey('groups')) {
+        print('Missing group/groups key');
         return null;
       }
 
@@ -431,7 +489,6 @@ class ExportImportService {
     }
   }
 
-  // Import from picked file
   static Future<String> importFromPickedFile() async {
     final file = await pickFileFromDevice();
 
@@ -439,7 +496,6 @@ class ExportImportService {
       throw Exception('No file selected');
     }
 
-    // Validate file
     final preview = await readAndValidateJson(file.path);
     if (preview == null) {
       throw Exception(
@@ -447,7 +503,6 @@ class ExportImportService {
       );
     }
 
-    // Import the file
     return await importFromFilePath(file.path);
   }
 
@@ -469,31 +524,101 @@ class ExportImportService {
     return targetFile;
   }
 
-  // Helper to check for duplicate groups before import
   static Future<List<String>> checkForDuplicates(String filePath) async {
-    final data = await readAndValidateJson(filePath);
-    if (data == null) return [];
+    try {
+      final data = await readAndValidateJson(filePath);
+      if (data == null) return [];
 
-    final duplicates = <String>[];
+      final duplicates = <String>[];
 
-    if (data.containsKey('groups')) {
-      for (var groupData in data['groups'] as List) {
-        final groupId = groupData['group']['id'];
-        final groupName = groupData['group']['name'];
+      if (data.containsKey('groups')) {
+        final groupsData = data['groups'] as List;
+        for (var groupData in groupsData) {
+          final groupMap = groupData as Map<String, dynamic>;
+          final group = groupMap['group'] as Map<String, dynamic>;
+          final groupId = group['id'] as String;
+          final groupName = group['name'] as String;
+          final existing = await _db.getGroup(groupId);
+          if (existing != null) {
+            duplicates.add(groupName);
+          }
+        }
+      } else if (data.containsKey('group')) {
+        final groupMap = data['group'] as Map<String, dynamic>;
+        final groupId = groupMap['id'] as String;
+        final groupName = groupMap['name'] as String;
         final existing = await _db.getGroup(groupId);
         if (existing != null) {
           duplicates.add(groupName);
         }
       }
-    } else if (data.containsKey('group')) {
-      final groupId = data['group']['id'];
-      final groupName = data['group']['name'];
-      final existing = await _db.getGroup(groupId);
-      if (existing != null) {
-        duplicates.add(groupName);
-      }
-    }
 
-    return duplicates;
+      return duplicates;
+    } catch (e) {
+      print('Check duplicates error: $e');
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>?> getBackupInfo(String filePath) async {
+    try {
+      final data = await readAndValidateJson(filePath);
+      if (data == null) return null;
+
+      final version = data['version'] as String;
+      final exportDate = data['exportDate'] as String;
+
+      if (data.containsKey('groups')) {
+        final totalGroups = data['totalGroups'] as int;
+        final groupsData = data['groups'] as List;
+
+        return {
+          'type': 'all_groups',
+          'version': version,
+          'exportDate': exportDate,
+          'totalGroups': totalGroups,
+          'groupNames': groupsData.map((g) {
+            final groupMap = g as Map<String, dynamic>;
+            final group = groupMap['group'] as Map<String, dynamic>;
+            return group['name'];
+          }).toList(),
+        };
+      } else if (data.containsKey('group')) {
+        final groupMap = data['group'] as Map<String, dynamic>;
+        final groupName = groupMap['name'] as String;
+        final expensesData = data['expenses'] as List;
+
+        final hasSettlements = expensesData.any((e) {
+          final expenseMap = e as Map<String, dynamic>;
+          return expenseMap['isSettlement'] == true;
+        });
+
+        final hasMultiPayers =
+            version == '2.0' &&
+            expensesData.any((e) {
+              final expenseMap = e as Map<String, dynamic>;
+              if (expenseMap.containsKey('payers')) {
+                final payers = expenseMap['payers'] as List;
+                return payers.length > 1;
+              }
+              return false;
+            });
+
+        return {
+          'type': 'single_group',
+          'version': version,
+          'exportDate': exportDate,
+          'groupName': groupName,
+          'expenseCount': expensesData.length,
+          'hasSettlements': hasSettlements,
+          'hasMultiPayers': hasMultiPayers,
+        };
+      }
+
+      return null;
+    } catch (e) {
+      print('Get backup info error: $e');
+      return null;
+    }
   }
 }

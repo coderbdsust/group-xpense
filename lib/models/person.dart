@@ -1,3 +1,5 @@
+// lib/models/person.dart
+
 class Person {
   final String id;
   final String name;
@@ -6,16 +8,40 @@ class Person {
 
   Person({required this.id, required this.name, this.email, this.avatar});
 
-  Map<String, dynamic> toJson() {
+  // Add toMap method
+  Map<String, dynamic> toMap() {
     return {'id': id, 'name': name, 'email': email, 'avatar': avatar};
   }
 
-  factory Person.fromJson(Map<String, dynamic> json) {
+  // Add fromMap factory
+  factory Person.fromMap(Map<String, dynamic> map) {
     return Person(
-      id: json['id'],
-      name: json['name'],
-      email: json['email'],
-      avatar: json['avatar'],
+      id: map['id'] as String,
+      name: map['name'] as String,
+      email: map['email'] as String?,
+      avatar: map['avatar'] as String?,
     );
   }
+
+  // Add copyWith method (useful for editing)
+  Person copyWith({String? id, String? name, String? email, String? avatar}) {
+    return Person(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      avatar: avatar ?? this.avatar,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Person && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() => 'Person(id: $id, name: $name, email: $email)';
 }

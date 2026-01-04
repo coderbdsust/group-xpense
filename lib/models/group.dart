@@ -1,3 +1,6 @@
+// lib/models/group.dart
+
+import 'dart:convert'; // Add this import
 import 'person.dart';
 
 class Group {
@@ -15,25 +18,45 @@ class Group {
     required this.createdAt,
   });
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
       'name': name,
       'description': description,
-      'members': members.map((m) => m.toJson()).toList(),
+      'members': jsonEncode(members.map((m) => m.toMap()).toList()),
       'createdAt': createdAt.toIso8601String(),
     };
   }
 
-  factory Group.fromJson(Map<String, dynamic> json) {
+  factory Group.fromMap(Map<String, dynamic> map) {
     return Group(
-      id: json['id'],
-      name: json['name'],
-      description: json['description'],
-      members: (json['members'] as List)
-          .map((m) => Person.fromJson(m))
+      id: map['id'] as String,
+      name: map['name'] as String,
+      description: map['description'] as String?,
+      members: (jsonDecode(map['members']) as List)
+          .map((m) => Person.fromMap(m as Map<String, dynamic>))
           .toList(),
-      createdAt: DateTime.parse(json['createdAt']),
+      createdAt: DateTime.parse(map['createdAt'] as String),
     );
   }
+
+  Group copyWith({
+    String? id,
+    String? name,
+    String? description,
+    List<Person>? members,
+    DateTime? createdAt,
+  }) {
+    return Group(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      members: members ?? this.members,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  String toString() =>
+      'Group(id: $id, name: $name, members: ${members.length})';
 }

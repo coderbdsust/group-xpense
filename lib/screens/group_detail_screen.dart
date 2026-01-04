@@ -1,19 +1,36 @@
+// lib/screens/group_detail_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/expense_provider.dart';
 import '../models/group.dart';
 import '../models/expense.dart';
-import 'add_expense_screen.dart';
 import 'expense_detail_screen.dart';
 import 'reports_screen.dart';
 import 'edit_group_screen.dart';
+import 'add_expense_multi_payer_screen.dart';
+import 'settle_up_screen.dart';
 import '../widgets/currency_text.dart';
 
-class GroupDetailScreen extends StatelessWidget {
+class GroupDetailScreen extends StatefulWidget {
   final Group group;
 
   const GroupDetailScreen({super.key, required this.group});
+
+  @override
+  State<GroupDetailScreen> createState() => _GroupDetailScreenState();
+}
+
+class _GroupDetailScreenState extends State<GroupDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Force refresh when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ExpenseProvider>(context, listen: false).refreshGroups();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,17 +38,35 @@ class GroupDetailScreen extends StatelessWidget {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(group.name),
+          title: Text(widget.group.name),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.handshake),
+              tooltip: 'Settle Up',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SettleUpScreen(group: widget.group),
+                  ),
+                ).then((_) {
+                  // Refresh when returning from settle up
+                  setState(() {});
+                });
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => EditGroupScreen(group: group),
+                    builder: (context) => EditGroupScreen(group: widget.group),
                   ),
-                );
+                ).then((_) {
+                  // Refresh when returning from edit
+                  setState(() {});
+                });
               },
             ),
             IconButton(
@@ -40,7 +75,7 @@ class GroupDetailScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ReportsScreen(group: group),
+                    builder: (context) => ReportsScreen(group: widget.group),
                   ),
                 );
               },
@@ -56,9 +91,9 @@ class GroupDetailScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _ExpensesTab(group: group),
-            _BalancesTab(group: group),
-            _MembersTab(group: group),
+            _ExpensesTab(group: widget.group),
+            _BalancesTab(group: widget.group),
+            _MembersTab(group: widget.group),
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
@@ -66,9 +101,13 @@ class GroupDetailScreen extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => AddExpenseScreen(group: group),
+                builder: (context) =>
+                    AddExpenseMultiPayerScreen(group: widget.group),
               ),
-            );
+            ).then((_) {
+              // Refresh when returning from add expense
+              setState(() {});
+            });
           },
           icon: const Icon(Icons.add),
           label: const Text('Add Expense'),
@@ -78,22 +117,66 @@ class GroupDetailScreen extends StatelessWidget {
   }
 }
 
-class _ExpensesTab extends StatelessWidget {
+class _ExpensesTab extends StatefulWidget {
   final Group group;
 
   const _ExpensesTab({required this.group});
 
   @override
+  State<_ExpensesTab> createState() => _ExpensesTabState();
+}
+
+class _ExpensesTabState extends State<_ExpensesTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+
     return Consumer<ExpenseProvider>(
       builder: (context, provider, child) {
         return FutureBuilder<List<Expense>>(
-          future: provider.getGroupExpenses(group.id),
+          future: provider.getGroupExpenses(widget.group.id),
           builder: (context, snapshot) {
+            // Show loading indicator
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
+            // Show error if something went wrong
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 80, color: Colors.red[300]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading expenses',
+                      style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error.toString(),
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {}); // Retry
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Show empty state if no expenses
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return Center(
                 child: Column(
@@ -119,17 +202,36 @@ class _ExpensesTab extends StatelessWidget {
               );
             }
 
+            // Show expenses list
             final expenses = snapshot.data!;
             return RefreshIndicator(
               onRefresh: () async {
-                provider.notifyListeners();
+                setState(() {}); // Trigger rebuild
+                await Future.delayed(const Duration(milliseconds: 300));
               },
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
                 itemCount: expenses.length,
                 itemBuilder: (context, index) {
                   final expense = expenses[index];
-                  return _ExpenseCard(expense: expense, group: group);
+                  return _ExpenseCard(
+                    expense: expense,
+                    group: widget.group,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ExpenseDetailScreen(
+                            expense: expense,
+                            group: widget.group,
+                          ),
+                        ),
+                      ).then((_) {
+                        // Refresh when returning from detail
+                        setState(() {});
+                      });
+                    },
+                  );
                 },
               ),
             );
@@ -143,23 +245,23 @@ class _ExpensesTab extends StatelessWidget {
 class _ExpenseCard extends StatelessWidget {
   final Expense expense;
   final Group group;
+  final VoidCallback? onTap;
 
-  const _ExpenseCard({required this.expense, required this.group});
+  const _ExpenseCard({required this.expense, required this.group, this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    // Determine if this is a settlement
+    final isSettlement = expense.isSettlement;
+    final displayIcon = isSettlement
+        ? Icons.handshake
+        : _getCategoryIcon(expense.category);
+    final displayColor = isSettlement ? Colors.purple : Colors.teal;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  ExpenseDetailScreen(expense: expense, group: group),
-            ),
-          );
-        },
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -170,26 +272,52 @@ class _ExpenseCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.teal[50],
+                      color: displayColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
-                      _getCategoryIcon(expense.category),
-                      color: Colors.teal,
-                    ),
+                    child: Icon(displayIcon, color: displayColor),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          expense.description,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                expense.description,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            if (isSettlement)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.purple[200]!,
+                                  ),
+                                ),
+                                child: Text(
+                                  'SETTLEMENT',
+                                  style: TextStyle(
+                                    color: Colors.purple[700],
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           DateFormat('MMM dd, yyyy').format(expense.date),
                           style: TextStyle(
@@ -200,12 +328,13 @@ class _ExpenseCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                   CurrencyText(
                     amount: expense.amount,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.teal,
+                      color: displayColor,
                     ),
                   ),
                 ],
@@ -213,24 +342,85 @@ class _ExpenseCard extends StatelessWidget {
               const Divider(height: 20),
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.green[100],
-                    child: Text(
-                      expense.paidBy.name[0].toUpperCase(),
-                      style: TextStyle(
-                        color: Colors.green[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                  // Show multiple payers if applicable
+                  if (expense.payers.isEmpty)
+                    // Fallback if no payers
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 16,
+                          color: Colors.orange,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'No payer info',
+                          style: TextStyle(
+                            color: Colors.orange[700],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    )
+                  else if (expense.payers.length == 1) ...[
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.green[100],
+                      child: Text(
+                        expense.payers.first.person.name[0].toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${expense.paidBy.name} paid',
-                    style: TextStyle(color: Colors.grey[700], fontSize: 13),
-                  ),
-                  const Spacer(),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${expense.payers.first.person.name} paid',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ] else ...[
+                    SizedBox(
+                      width: (expense.payers.length.clamp(0, 3) * 20.0) + 16,
+                      height: 32,
+                      child: Stack(
+                        children: [
+                          for (
+                            var i = 0;
+                            i < expense.payers.length.clamp(0, 3);
+                            i++
+                          )
+                            Positioned(
+                              left: i * 20.0,
+                              child: CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.green[100],
+                                child: Text(
+                                  expense.payers[i].person.name[0]
+                                      .toUpperCase(),
+                                  style: TextStyle(
+                                    color: Colors.green[700],
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${expense.payers.length} payer${expense.payers.length > 1 ? 's' : ''}',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                      ),
+                    ),
+                  ],
                   Text(
                     '${expense.participants.length} participant${expense.participants.length > 1 ? 's' : ''}',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
@@ -246,16 +436,20 @@ class _ExpenseCard extends StatelessWidget {
 
   IconData _getCategoryIcon(String? category) {
     switch (category) {
-      case 'Food':
+      case 'Food & Drinks':
         return Icons.restaurant;
-      case 'Transport':
+      case 'Transportation':
         return Icons.directions_car;
       case 'Entertainment':
         return Icons.movie;
       case 'Shopping':
         return Icons.shopping_bag;
-      case 'Accommodation':
-        return Icons.hotel;
+      case 'Utilities':
+        return Icons.electrical_services;
+      case 'Rent':
+        return Icons.home;
+      case 'Settlement':
+        return Icons.handshake;
       default:
         return Icons.receipt;
     }
@@ -279,6 +473,22 @@ class _BalancesTab extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 80, color: Colors.red[300]),
+                const SizedBox(height: 16),
+                Text(
+                  'Error loading balances',
+                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          );
         }
 
         if (!snapshot.hasData) {
@@ -305,147 +515,205 @@ class _BalancesTab extends StatelessWidget {
             snapshot.data![0] as Map<String, Map<String, double>>;
         final totalExpenses = snapshot.data![1] as double;
 
-        if (settlements.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 80,
-                  color: Colors.grey[300],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No balances to show',
-                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          );
+        // Check if there are any actual settlements
+        bool hasSettlements = false;
+        for (var creditors in settlements.values) {
+          for (var amount in creditors.values) {
+            if (amount > 0.01) {
+              hasSettlements = true;
+              break;
+            }
+          }
+          if (hasSettlements) break;
         }
 
-        return ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Card(
-              color: Colors.teal[50],
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
+        return RefreshIndicator(
+          onRefresh: () async {
+            // Clear cache and refresh
+            final expenseProvider = Provider.of<ExpenseProvider>(
+              context,
+              listen: false,
+            );
+            await expenseProvider.refreshGroups();
+          },
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                color: Colors.teal[50],
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Total Group Expenses',
+                        style: TextStyle(fontSize: 16, color: Colors.teal),
+                      ),
+                      const SizedBox(height: 8),
+                      CurrencyText(
+                        amount: totalExpenses,
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              if (!hasSettlements) ...[
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 80,
+                        color: Colors.green[300],
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'All Settled Up!',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No pending settlements',
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Total Group Expenses',
-                      style: TextStyle(fontSize: 16, color: Colors.teal),
-                    ),
-                    const SizedBox(height: 8),
-                    CurrencyText(
-                      amount: totalExpenses,
-                      style: const TextStyle(
-                        fontSize: 32,
+                      'Who Owes Whom',
+                      style: TextStyle(
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.teal,
                       ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SettleUpScreen(group: group),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.handshake, size: 18),
+                      label: const Text('Settle Up'),
                     ),
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Who Owes Whom',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ...settlements.entries.expand((debtorEntry) {
-              final debtorId = debtorEntry.key;
-              final debtor = group.members.firstWhere((m) => m.id == debtorId);
+                const SizedBox(height: 12),
+                ...settlements.entries.expand((debtorEntry) {
+                  final debtorId = debtorEntry.key;
+                  final debtor = group.members.firstWhere(
+                    (m) => m.id == debtorId,
+                  );
 
-              return debtorEntry.value.entries.map((creditorEntry) {
-                final creditorId = creditorEntry.key;
-                final amount = creditorEntry.value;
-                final creditor = group.members.firstWhere(
-                  (m) => m.id == creditorId,
-                );
+                  return debtorEntry.value.entries
+                      .where((e) => e.value > 0.01)
+                      .map((creditorEntry) {
+                        final creditorId = creditorEntry.key;
+                        final amount = creditorEntry.value;
+                        final creditor = group.members.firstWhere(
+                          (m) => m.id == creditorId,
+                        );
 
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.red[100],
-                          child: Text(
-                            debtor.name[0].toUpperCase(),
-                            style: TextStyle(
-                              color: Colors.red[700],
-                              fontWeight: FontWeight.bold,
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: Colors.red[100],
+                                  child: Text(
+                                    debtor.name[0].toUpperCase(),
+                                    style: TextStyle(
+                                      color: Colors.red[700],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        debtor.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        'owes',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_forward,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        creditor.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      CurrencyText(
+                                        amount: amount,
+                                        style: TextStyle(
+                                          color: Colors.green[700],
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                CircleAvatar(
+                                  backgroundColor: Colors.green[100],
+                                  child: Text(
+                                    creditor.name[0].toUpperCase(),
+                                    style: TextStyle(
+                                      color: Colors.green[700],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                debtor.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                'owes',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.arrow_forward, color: Colors.grey),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                creditor.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              CurrencyText(
-                                amount: amount,
-                                style: TextStyle(
-                                  color: Colors.green[700],
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        CircleAvatar(
-                          backgroundColor: Colors.green[100],
-                          child: Text(
-                            creditor.name[0].toUpperCase(),
-                            style: TextStyle(
-                              color: Colors.green[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              });
-            }),
-          ],
+                        );
+                      });
+                }),
+              ],
+            ],
+          ),
         );
       },
     );

@@ -1,3 +1,5 @@
+// lib/providers/expense_provider.dart
+
 import 'package:flutter/foundation.dart';
 import '../models/group.dart';
 import '../models/person.dart';
@@ -40,7 +42,6 @@ class ExpenseProvider extends ChangeNotifier {
     await loadGroups();
   }
 
-  // Add after updateGroup method
   Future<void> addMemberToGroup(String groupId, Person person) async {
     await _db.addMemberToGroup(groupId, person);
     await loadGroups();
@@ -69,13 +70,8 @@ class ExpenseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Expense?> getExpense(String expenseId, String groupId) async {
-    final expenses = await getGroupExpenses(groupId);
-    try {
-      return expenses.firstWhere((e) => e.id == expenseId);
-    } catch (e) {
-      return null;
-    }
+  Future<Expense?> getExpense(String expenseId) async {
+    return await _db.getExpense(expenseId);
   }
 
   Future<List<Expense>> getGroupExpenses(String groupId) async {
@@ -96,28 +92,36 @@ class ExpenseProvider extends ChangeNotifier {
     }
   }
 
+  // Updated to accept groupId parameter
   Future<Map<String, Map<String, double>>> calculateBalances(
-      String groupId,
-      ) async {
+    String groupId,
+  ) async {
     final groupExpenses = await getGroupExpenses(groupId);
     final balances = <String, double>{};
 
     final group = getGroup(groupId);
     if (group == null) return {};
 
+    // Initialize balances for all members
     for (var member in group.members) {
       balances[member.id] = 0;
     }
 
+    // Calculate balances from all expenses (including settlements)
     for (var expense in groupExpenses) {
-      balances[expense.paidBy.id] =
-          (balances[expense.paidBy.id] ?? 0) + expense.amount;
+      // Add amounts paid by each payer
+      for (var payer in expense.payers) {
+        balances[payer.person.id] =
+            (balances[payer.person.id] ?? 0) + payer.amount;
+      }
 
+      // Subtract split amounts
       for (var entry in expense.splits.entries) {
         balances[entry.key] = (balances[entry.key] ?? 0) - entry.value;
       }
     }
 
+    // Calculate optimal settlements
     final settlements = <String, Map<String, double>>{};
     final creditors = <String, double>{};
     final debtors = <String, double>{};
@@ -153,60 +157,170 @@ class ExpenseProvider extends ChangeNotifier {
     return settlements;
   }
 
+  // UPDATED: Exclude settlements from total expenses
   Future<double> getTotalExpenses(String groupId) async {
     final expenses = await getGroupExpenses(groupId);
-    return expenses.fold<double>(0.0, (sum, expense) => sum + expense.amount);
+    return expenses
+        .where((expense) => !expense.isSettlement) // Exclude settlements
+        .fold<double>(0.0, (sum, expense) => sum + expense.amount);
   }
 
   Future<double> getPersonTotalPaid(String groupId, String personId) async {
     final expenses = await getGroupExpenses(groupId);
-    return expenses
-        .where((e) => e.paidBy.id == personId)
-        .fold<double>(0.0, (sum, expense) => sum + expense.amount);
+    return expenses.fold<double>(0.0, (sum, expense) {
+      // Sum all amounts this person paid across all expenses (including settlements)
+      final personPayments = expense.payers
+          .where((payer) => payer.person.id == personId)
+          .fold<double>(0.0, (payerSum, payer) => payerSum + payer.amount);
+      return sum + personPayments;
+    });
   }
 
   Future<double> getPersonTotalOwed(String groupId, String personId) async {
     final expenses = await getGroupExpenses(groupId);
     return expenses.fold<double>(
       0.0,
-          (sum, expense) => sum + (expense.splits[personId] ?? 0),
+      (sum, expense) => sum + (expense.splits[personId] ?? 0),
     );
   }
 
-  // Reporting methods
+  Future<double> getPersonBalance(String groupId, String personId) async {
+    final totalPaid = await getPersonTotalPaid(groupId, personId);
+    final totalOwed = await getPersonTotalOwed(groupId, personId);
+    return totalPaid - totalOwed;
+  }
+
+  // Reporting methods - UPDATED to exclude settlements
   Future<Map<String, double>> getExpensesByCategory(String groupId) async {
     final expenses = await getGroupExpenses(groupId);
     final categoryTotals = <String, double>{};
 
     for (var expense in expenses) {
+      // Don't include settlements in category breakdown
+      if (expense.isSettlement) continue;
+
       final category = expense.category ?? 'Other';
-      categoryTotals[category] = (categoryTotals[category] ?? 0) + expense.amount;
+      categoryTotals[category] =
+          (categoryTotals[category] ?? 0) + expense.amount;
     }
 
     return categoryTotals;
   }
 
+  // UPDATED: Exclude settlements from monthly count
   Future<Map<String, int>> getExpenseCountByMonth(String groupId) async {
     final expenses = await getGroupExpenses(groupId);
     final monthCounts = <String, int>{};
 
     for (var expense in expenses) {
-      final monthKey = '${expense.date.year}-${expense.date.month.toString().padLeft(2, '0')}';
+      // Skip settlements
+      if (expense.isSettlement) continue;
+
+      final monthKey =
+          '${expense.date.year}-${expense.date.month.toString().padLeft(2, '0')}';
       monthCounts[monthKey] = (monthCounts[monthKey] ?? 0) + 1;
     }
 
     return monthCounts;
   }
 
+  // UPDATED: Exclude settlements from monthly totals
   Future<Map<String, double>> getExpenseAmountByMonth(String groupId) async {
     final expenses = await getGroupExpenses(groupId);
     final monthTotals = <String, double>{};
 
     for (var expense in expenses) {
-      final monthKey = '${expense.date.year}-${expense.date.month.toString().padLeft(2, '0')}';
+      // Skip settlements
+      if (expense.isSettlement) continue;
+
+      final monthKey =
+          '${expense.date.year}-${expense.date.month.toString().padLeft(2, '0')}';
       monthTotals[monthKey] = (monthTotals[monthKey] ?? 0) + expense.amount;
     }
 
     return monthTotals;
   }
+
+  // Get all settlements for a group
+  Future<List<Expense>> getSettlements(String groupId) async {
+    final expenses = await getGroupExpenses(groupId);
+    return expenses.where((e) => e.isSettlement).toList();
+  }
+
+  // Get all non-settlement expenses for a group
+  Future<List<Expense>> getNormalExpenses(String groupId) async {
+    final expenses = await getGroupExpenses(groupId);
+    return expenses.where((e) => !e.isSettlement).toList();
+  }
+
+  // Check if a group has any unsettled balances
+  Future<bool> hasUnsettledBalances(String groupId) async {
+    final balances = await calculateBalances(groupId);
+
+    // Check if any settlements are needed
+    for (var settlements in balances.values) {
+      if (settlements.isNotEmpty) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Get summary of who owes whom
+  Future<List<DebtSummary>> getDebtSummary(String groupId) async {
+    final settlements = await calculateBalances(groupId);
+    final group = getGroup(groupId);
+    if (group == null) return [];
+
+    final summaries = <DebtSummary>[];
+
+    settlements.forEach((debtorId, creditors) {
+      final debtor = group.members.firstWhere((m) => m.id == debtorId);
+
+      creditors.forEach((creditorId, amount) {
+        if (amount > 0.01) {
+          final creditor = group.members.firstWhere((m) => m.id == creditorId);
+          summaries.add(
+            DebtSummary(from: debtor, to: creditor, amount: amount),
+          );
+        }
+      });
+    });
+
+    return summaries;
+  }
+
+  // NEW: Get statistics excluding settlements
+  Future<Map<String, dynamic>> getGroupStats(String groupId) async {
+    final expenses = await getGroupExpenses(groupId);
+    final normalExpenses = expenses.where((e) => !e.isSettlement).toList();
+    final settlements = expenses.where((e) => e.isSettlement).toList();
+
+    return {
+      'totalExpenses': normalExpenses.fold<double>(
+        0.0,
+        (sum, e) => sum + e.amount,
+      ),
+      'expenseCount': normalExpenses.length,
+      'settlementCount': settlements.length,
+      'averageExpense': normalExpenses.isEmpty
+          ? 0.0
+          : normalExpenses.fold<double>(0.0, (sum, e) => sum + e.amount) /
+                normalExpenses.length,
+    };
+  }
+}
+
+// Helper class for debt summary
+class DebtSummary {
+  final Person from;
+  final Person to;
+  final double amount;
+
+  DebtSummary({required this.from, required this.to, required this.amount});
+
+  @override
+  String toString() =>
+      '${from.name} owes ${to.name} \$${amount.toStringAsFixed(2)}';
 }
