@@ -8,11 +8,12 @@ class AppConstants {
   // Developer Info
   static const String developerName = 'Biswajit Debnath';
   static const String developerEmail = 'biswajit.sust@gmail.com';
-  static const String appWebsite = 'https://group-expense.firebaseapp.com';
-  static const String githubUrl = 'https://github.com/coderbdsust/group-xpense.git';
+  static const String appWebsite = 'https://group-xpense.firebaseapp.com';
+  static const String githubUrl =
+      'https://github.com/coderbdsust/group-xpense.git';
 
   // Release Info
-  static const String releaseDate = 'January 2025';
+  static const String releaseDate = 'January 2026';
   static const String lastUpdated = 'January 4, 2026';
 
   // Features

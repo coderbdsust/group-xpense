@@ -423,9 +423,9 @@ dependencies:
   sqflite: ^2.3.3+2             # SQLite database
   path: ^1.9.0                  # Path manipulation
   local_auth: ^2.2.0            # Biometric authentication
-  flutter_markdown: ^0.6.18     # Privacy policy rendering
-  path_provider: ^2.1.2         # File system access
-  share_plus: ^8.0.2            # Share functionality
+  flutter_markdown_plus: ^1.0.7 # Privacy policy rendering
+  path_provider: ^2.1.1         # File system access
+  share_plus: ^7.2.1            # Share functionality
   file_picker: ^8.0.0+1         # File selection
 
 dev_dependencies:
@@ -696,7 +696,7 @@ Give a ⭐️ if this project helped you manage your group expenses better!
 
 - **Version**: 2.1.0
 - **Build**: 2
-- **Release Date**: January 2025
+- **Release Date**: January 2026
 - **Last Updated**: January 4, 2026
 - **Status**: ✅ Production Ready
 - **Platforms**: Android, iOS

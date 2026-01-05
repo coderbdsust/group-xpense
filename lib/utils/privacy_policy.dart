@@ -182,7 +182,7 @@ ${AppConstants.appName} is built with Flutter and uses open-source libraries. Fo
 
 ---
 
-**Effective Date**: January 1, 2025
+**Effective Date**: January 1, 2026
 
 Thank you for trusting ${AppConstants.appName} with your expense tracking needs!
 ''';
