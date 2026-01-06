@@ -13,9 +13,9 @@ A beautiful and intuitive Flutter application for managing group expenses with m
 ## 🎨 Screenshots
 
 <div align="center">
-  <img src="screenshots/001-01.png" alt="Privacy Screen-1" width="30%"/>
-  <img src="screenshots/001-02.png" alt="Privacy Screen-2" width="30%"/>
-  <img src="screenshots/002.png" alt="Group Screen" width="30%"/>
+  <img src="screenshots/001-00.png" alt="Privacy Screen-1" width="30%"/>
+  <img src="screenshots/001-01.png" alt="Privacy Screen-2" width="30%"/>
+  <img src="screenshots/002-00.png" alt="Group Screen" width="30%"/>
 </div>
 
 <div align="center">
