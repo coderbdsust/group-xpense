@@ -3,13 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../models/expense.dart';
 import '../models/group.dart';
+import '../models/person.dart';
+import '../models/expense.dart';
 import '../providers/expense_provider.dart';
-import 'add_expense_multi_payer_screen.dart';
 import '../widgets/currency_text.dart';
+import 'add_expense_multi_payer_screen.dart';
 
-class ExpenseDetailScreen extends StatelessWidget {
+class ExpenseDetailScreen extends StatefulWidget {
   final Expense expense;
   final Group group;
 
@@ -20,423 +21,491 @@ class ExpenseDetailScreen extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isSettlement = expense.isSettlement;
-    final hasMultiplePayers = expense.payers.length > 1;
+  State<ExpenseDetailScreen> createState() => _ExpenseDetailScreenState();
+}
 
+class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
+  late Expense _currentExpense;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentExpense = widget.expense;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Expense Details'),
         actions: [
-          if (!isSettlement) ...[
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AddExpenseMultiPayerScreen(
-                      group: group,
-                      expense: expense,
-                    ),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: () => _deleteExpense(context),
-            ),
-          ] else
-            IconButton(
-              icon: const Icon(Icons.info_outline),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settlement expenses cannot be edited'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            onPressed: _editExpense,
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.white),
+            onPressed: () => _deleteExpense(context),
+          ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeaderSection(_currentExpense),
+            _buildPayersSection(_currentExpense),
+            _buildParticipantsSection(_currentExpense),
+            _buildSplitsSection(_currentExpense),
+            if (_currentExpense.notes != null &&
+                _currentExpense.notes!.isNotEmpty)
+              _buildNotesSection(_currentExpense),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editExpense() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddExpenseMultiPayerScreen(
+          group: widget.group,
+          expense: _currentExpense,
+        ),
+      ),
+    );
+
+    // If expense was updated, refresh the screen
+    if (result != null && result is Expense && mounted) {
+      setState(() {
+        _currentExpense = result;
+      });
+    }
+  }
+
+  Widget _buildHeaderSection(Expense expense) {
+    final isSettlement = expense.isSettlement;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isSettlement
+              ? [Colors.purple, Colors.purple[700]!]
+              : [Colors.teal, Colors.teal[700]!],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Settlement Badge (if applicable)
           if (isSettlement)
             Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.purple[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.purple[200]!),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.handshake, color: Colors.purple[700], size: 32),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Settlement Payment',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.purple[900],
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'This is a settlement record',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.purple[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Amount Card
-          Card(
-            color: isSettlement ? Colors.purple[50] : Colors.teal[50],
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
+                  Icon(Icons.handshake, color: Colors.purple[700], size: 16),
+                  const SizedBox(width: 6),
                   Text(
-                    isSettlement ? 'Settlement Amount' : 'Total Amount',
+                    'SETTLEMENT',
                     style: TextStyle(
-                      fontSize: 16,
-                      color: isSettlement ? Colors.purple : Colors.teal,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  CurrencyText(
-                    amount: expense.amount,
-                    style: TextStyle(
-                      fontSize: 40,
+                      color: Colors.purple[700],
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: isSettlement ? Colors.purple : Colors.teal,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-
-          // Details Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _DetailRow(
-                    icon: Icons.description,
-                    label: 'Description',
-                    value: expense.description,
-                  ),
-                  if (!isSettlement) ...[
-                    const Divider(height: 24),
-                    _DetailRow(
-                      icon: Icons.category,
-                      label: 'Category',
-                      value: expense.category ?? 'Uncategorized',
-                    ),
-                  ],
-                  const Divider(height: 24),
-                  _DetailRow(
-                    icon: Icons.calendar_today,
-                    label: 'Date',
-                    value: DateFormat('MMMM dd, yyyy').format(expense.date),
-                  ),
-                  if (expense.notes != null && expense.notes!.isNotEmpty) ...[
-                    const Divider(height: 24),
-                    _DetailRow(
-                      icon: Icons.note,
-                      label: 'Notes',
-                      value: expense.notes!,
-                    ),
-                  ],
-                ],
-              ),
+          if (isSettlement) const SizedBox(height: 12),
+          Text(
+            expense.description,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                DateFormat('EEEE, MMMM dd, yyyy').format(expense.date),
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
+              ),
+            ],
+          ),
+          if (expense.category != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.category, color: Colors.white70, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  expense.category!,
+                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
+          CurrencyText(
+            amount: expense.amount,
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-          // Payers Card (Multiple Payers Support)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        hasMultiplePayers ? Icons.groups : Icons.person,
-                        color: Colors.green,
+  Widget _buildPayersSection(Expense expense) {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.payment, color: Colors.teal[700]),
+                const SizedBox(width: 8),
+                const Text(
+                  'Who Paid',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...expense.payers.map(
+              (payer) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.green[100],
+                      child: Text(
+                        payer.person.name[0].toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.green[700],
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        hasMultiplePayers
-                            ? 'Paid By (${expense.payers.length} people)'
-                            : 'Paid By',
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        payer.person.name,
                         style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    CurrencyText(
+                      amount: payer.amount,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildParticipantsSection(Expense expense) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.teal[50],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.people, color: Colors.teal[700], size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Participants',
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  ...expense.payers.map((payer) {
-                    final percentage = (payer.amount / expense.amount) * 100;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.green[100],
-                          child: Text(
-                            payer.person.name[0].toUpperCase(),
-                            style: TextStyle(
-                              color: Colors.green[700],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          payer.person.name,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        subtitle: hasMultiplePayers
-                            ? Text(
-                                '${percentage.toStringAsFixed(1)}% of total',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                ),
-                              )
-                            : null,
-                        trailing: CurrencyText(
-                          amount: payer.amount,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green[700],
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Participants/Split Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.people, color: Colors.teal),
-                      const SizedBox(width: 8),
                       Text(
-                        isSettlement
-                            ? 'Involved'
-                            : 'Split Between (${expense.participants.length})',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        '${expense.participants.length} ${expense.participants.length == 1 ? 'person' : 'people'} sharing',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  ...expense.participants.map((person) {
-                    final split = expense.splits[person.id] ?? 0;
-                    final percentage = expense.amount > 0
-                        ? (split / expense.amount) * 100
-                        : 0.0;
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.teal,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${expense.participants.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.teal[100],
-                          child: Text(
-                            person.name[0].toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.teal,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          person.name,
-                          style: const TextStyle(fontWeight: FontWeight.w500),
-                        ),
-                        subtitle: !isSettlement && split > 0
-                            ? Text(
-                                '${percentage.toStringAsFixed(1)}% of total',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                ),
-                              )
-                            : null,
-                        trailing: split > 0
-                            ? CurrencyText(
-                                amount: split,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.teal,
-                                  fontSize: 16,
-                                ),
-                              )
-                            : Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  isSettlement ? 'Receiver' : 'Not split',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    );
-                  }),
-                ],
+            // Grid layout for participants
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 2.5,
+              ),
+              itemCount: expense.participants.length,
+              itemBuilder: (context, index) {
+                final participant = expense.participants[index];
+                return _buildParticipantCard(participant);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildParticipantCard(Person participant) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.teal[50]!, Colors.teal[100]!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.teal[300]!, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.teal.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.teal,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.teal.withOpacity(0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                participant.name[0].toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              participant.name,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal[900],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-          // Summary Card
-          if (!isSettlement)
-            Card(
-              color: Colors.blue[50],
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+  Widget _buildSplitsSection(Expense expense) {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.pie_chart, color: Colors.teal[700]),
+                const SizedBox(width: 8),
+                const Text(
+                  'Split Details',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...expense.splits.entries.map((entry) {
+              final person = expense.participants.firstWhere(
+                (p) => p.id == entry.key,
+                orElse: () => expense.payers
+                    .firstWhere((payer) => payer.person.id == entry.key)
+                    .person,
+              );
+              final percentage = (entry.value / expense.amount * 100);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.summarize, color: Colors.blue[700]),
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: Colors.blue[100],
+                          child: Text(
+                            person.name[0].toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.blue[700],
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            person.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        CurrencyText(
+                          amount: entry.value,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue[700],
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Summary',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _SummaryRow(label: 'Total Expense', value: expense.amount),
-                    _SummaryRow(
-                      label: 'Total Paid',
-                      value: expense.totalPaidAmount,
-                    ),
-                    const Divider(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
                         Text(
-                          'Balance',
+                          '(${percentage.toStringAsFixed(1)}%)',
                           style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.grey[600],
                           ),
                         ),
-                        Row(
-                          children: [
-                            Icon(
-                              (expense.totalPaidAmount - expense.amount).abs() <
-                                      0.01
-                                  ? Icons.check_circle
-                                  : Icons.warning,
-                              size: 16,
-                              color:
-                                  (expense.totalPaidAmount - expense.amount)
-                                          .abs() <
-                                      0.01
-                                  ? Colors.green
-                                  : Colors.orange,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              (expense.totalPaidAmount - expense.amount).abs() <
-                                      0.01
-                                  ? 'Balanced'
-                                  : 'Imbalanced',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color:
-                                    (expense.totalPaidAmount - expense.amount)
-                                            .abs() <
-                                        0.01
-                                    ? Colors.green
-                                    : Colors.orange,
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: percentage / 100,
+                      backgroundColor: Colors.grey[200],
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.blue,
+                      ),
+                      minHeight: 6,
+                      borderRadius: BorderRadius.circular(3),
                     ),
                   ],
                 ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotesSection(Expense expense) {
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.note, color: Colors.teal[700]),
+                const SizedBox(width: 8),
+                const Text(
+                  'Notes',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              expense.notes!,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                height: 1.5,
               ),
             ),
-
-          const SizedBox(height: 16),
-
-          // Delete Button for Settlements
-          if (isSettlement)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: OutlinedButton.icon(
-                onPressed: () => _deleteExpense(context),
-                icon: const Icon(Icons.delete, color: Colors.red),
-                label: const Text(
-                  'Delete Settlement',
-                  style: TextStyle(color: Colors.red),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -445,107 +514,37 @@ class ExpenseDetailScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          expense.isSettlement ? 'Delete Settlement' : 'Delete Expense',
-        ),
-        content: Text(
-          expense.isSettlement
-              ? 'Are you sure you want to delete this settlement? This will affect the group balances.'
-              : 'Are you sure you want to delete this expense?',
-        ),
+        title: const Text('Delete Expense'),
+        content: const Text('Are you sure you want to delete this expense?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              await Provider.of<ExpenseProvider>(
+          TextButton(
+            onPressed: () {
+              final provider = Provider.of<ExpenseProvider>(
                 context,
                 listen: false,
-              ).deleteExpense(expense.id, group.id);
-              if (context.mounted) {
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Close detail screen
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      expense.isSettlement
-                          ? 'Settlement deleted successfully'
-                          : 'Expense deleted successfully',
-                    ),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-}
+              );
+              // Pass both expenseId and groupId
+              provider.deleteExpense(
+                _currentExpense.id,
+                _currentExpense.groupId,
+              );
 
-class _DetailRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Close detail screen
 
-  const _DetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.teal, size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Expense deleted successfully'),
+                  backgroundColor: Colors.red,
                 ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final double value;
-
-  const _SummaryRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-          CurrencyText(
-            amount: value,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              );
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
           ),
         ],
       ),

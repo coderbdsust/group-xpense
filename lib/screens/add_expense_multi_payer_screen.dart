@@ -27,7 +27,6 @@ class _AddExpenseMultiPayerScreenState
     extends State<AddExpenseMultiPayerScreen> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
-  final _amountController = TextEditingController();
   final _notesController = TextEditingController();
 
   // Multiple payers
@@ -69,7 +68,6 @@ class _AddExpenseMultiPayerScreenState
   void _loadExpenseData() {
     if (widget.expense != null) {
       _descriptionController.text = widget.expense!.description;
-      _amountController.text = widget.expense!.amount.toStringAsFixed(2);
       _notesController.text = widget.expense!.notes ?? '';
       _selectedDate = widget.expense!.date;
       _selectedCategory = widget.expense!.category;
@@ -93,10 +91,17 @@ class _AddExpenseMultiPayerScreenState
     }
   }
 
+  double _calculateTotalPaidAmount() {
+    return _selectedPayers.fold<double>(
+      0.0,
+      (sum, id) =>
+          sum + (double.tryParse(_payerAmountControllers[id]!.text) ?? 0.0),
+    );
+  }
+
   @override
   void dispose() {
     _descriptionController.dispose();
-    _amountController.dispose();
     _notesController.dispose();
     _payerAmountControllers.values.forEach(
       (controller) => controller.dispose(),
@@ -111,7 +116,10 @@ class _AddExpenseMultiPayerScreenState
       appBar: AppBar(
         title: Text(widget.expense == null ? 'Add Expense' : 'Edit Expense'),
         actions: [
-          IconButton(icon: const Icon(Icons.check), onPressed: _saveExpense),
+          IconButton(
+            icon: const Icon(Icons.check, color: Colors.white),
+            onPressed: _saveExpense,
+          ),
         ],
       ),
       body: Form(
@@ -151,8 +159,11 @@ class _AddExpenseMultiPayerScreenState
               decoration: const InputDecoration(
                 labelText: 'Description *',
                 hintText: 'What was this for?',
-                prefixIcon: Icon(Icons.description),
+                prefixIcon: Icon(Icons.description, color: Colors.teal),
                 border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.teal, width: 2),
+                ),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -162,36 +173,75 @@ class _AddExpenseMultiPayerScreenState
               },
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _amountController,
-              decoration: const InputDecoration(
-                labelText: 'Total Amount *',
-                hintText: '0.00',
-                prefixIcon: Icon(Icons.attach_money),
-                border: OutlineInputBorder(),
+
+            // Auto-calculated Total Amount Display
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.teal[50]!, Colors.teal[100]!],
+                ),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.teal[300]!, width: 2),
               ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.calculate, color: Colors.teal[700], size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Total Amount',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.attach_money,
+                        color: Colors.teal,
+                        size: 20,
+                      ),
+                      Text(
+                        _calculateTotalPaidAmount().toStringAsFixed(2),
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal[900],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Calculated from "Who Paid" amounts below',
+                    style: TextStyle(
+                      color: Colors.teal[700],
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
               ),
-              onChanged: (value) => _calculateEqualSplit(),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter an amount';
-                }
-                if (double.tryParse(value) == null ||
-                    double.parse(value) <= 0) {
-                  return 'Please enter a valid amount';
-                }
-                return null;
-              },
             ),
+
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _selectedCategory,
               decoration: const InputDecoration(
                 labelText: 'Category',
-                prefixIcon: Icon(Icons.category),
+                prefixIcon: Icon(Icons.category, color: Colors.teal),
                 border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.teal, width: 2),
+                ),
               ),
               items: _categories.map((category) {
                 return DropdownMenuItem(value: category, child: Text(category));
@@ -199,23 +249,52 @@ class _AddExpenseMultiPayerScreenState
               onChanged: (value) => setState(() => _selectedCategory = value),
             ),
             const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('Date'),
-              subtitle: Text(
-                '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-              ),
-              trailing: const Icon(Icons.chevron_right),
+            InkWell(
               onTap: _selectDate,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[400]!),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.teal),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Date',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          Text(
+                            '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.grey),
+                  ],
+                ),
+              ),
             ),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _notesController,
               decoration: const InputDecoration(
                 labelText: 'Notes (optional)',
                 hintText: 'Add additional details',
-                prefixIcon: Icon(Icons.note),
+                prefixIcon: Icon(Icons.note, color: Colors.teal),
                 border: OutlineInputBorder(),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.teal, width: 2),
+                ),
               ),
               maxLines: 2,
             ),
@@ -243,13 +322,30 @@ class _AddExpenseMultiPayerScreenState
                   onPressed: _autoDistributePayers,
                   icon: const Icon(Icons.auto_fix_high, size: 18),
                   label: const Text('Auto Split'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.teal),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              'Select one or more people who paid for this expense',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Select payers and enter amounts. Total expense will be calculated automatically.',
+                      style: TextStyle(color: Colors.blue[900], fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             ...widget.group.members.map((member) => _buildPayerTile(member)),
@@ -265,78 +361,108 @@ class _AddExpenseMultiPayerScreenState
     final isSelected = _selectedPayers.contains(member.id);
     final controller = _payerAmountControllers[member.id]!;
 
-    return CheckboxListTile(
-      value: isSelected,
-      onChanged: (value) {
-        setState(() {
-          if (value == true) {
-            _selectedPayers.add(member.id);
-          } else {
-            _selectedPayers.remove(member.id);
-            controller.text = '0.00';
-          }
-        });
-      },
-      title: Text(member.name),
-      subtitle: isSelected
-          ? Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: TextFormField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'Amount paid',
-                  prefixIcon: Icon(Icons.attach_money, size: 18),
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (value) {
-                  if (isSelected) {
-                    if (value == null || value.isEmpty) {
-                      return 'Enter amount';
-                    }
-                    if (double.tryParse(value) == null ||
-                        double.parse(value) < 0) {
-                      return 'Invalid amount';
-                    }
-                  }
-                  return null;
-                },
-              ),
-            )
-          : null,
-      secondary: CircleAvatar(
-        backgroundColor: isSelected ? Colors.teal : Colors.grey[300],
-        child: Text(
-          member.name[0].toUpperCase(),
-          style: TextStyle(color: isSelected ? Colors.white : Colors.grey[700]),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isSelected ? Colors.teal[50] : Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? Colors.teal : Colors.grey[300]!,
+          width: isSelected ? 2 : 1,
         ),
+      ),
+      child: CheckboxListTile(
+        value: isSelected,
+        onChanged: (value) {
+          setState(() {
+            if (value == true) {
+              _selectedPayers.add(member.id);
+            } else {
+              _selectedPayers.remove(member.id);
+              controller.text = '0.00';
+            }
+            _calculateEqualSplit();
+          });
+        },
+        title: Text(
+          member.name,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? Colors.teal[900] : Colors.grey[800],
+          ),
+        ),
+        subtitle: isSelected
+            ? Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: TextFormField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: 'Amount paid',
+                    prefixIcon: const Icon(
+                      Icons.attach_money,
+                      size: 18,
+                      color: Colors.teal,
+                    ),
+                    border: const OutlineInputBorder(),
+                    focusedBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.teal, width: 2),
+                    ),
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _calculateEqualSplit();
+                    });
+                  },
+                  validator: (value) {
+                    if (isSelected) {
+                      if (value == null || value.isEmpty) {
+                        return 'Enter amount';
+                      }
+                      if (double.tryParse(value) == null ||
+                          double.parse(value) < 0) {
+                        return 'Invalid amount';
+                      }
+                    }
+                    return null;
+                  },
+                ),
+              )
+            : null,
+        secondary: CircleAvatar(
+          backgroundColor: isSelected ? Colors.teal : Colors.grey[400],
+          child: Text(
+            member.name[0].toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        activeColor: Colors.teal,
+        checkColor: Colors.white,
+        controlAffinity: ListTileControlAffinity.trailing,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       ),
     );
   }
 
   Widget _buildPayersSummary() {
-    final totalPaid = _selectedPayers.fold<double>(
-      0.0,
-      (sum, id) =>
-          sum + (double.tryParse(_payerAmountControllers[id]!.text) ?? 0.0),
-    );
-
-    final totalExpense = double.tryParse(_amountController.text) ?? 0.0;
-    final difference = totalPaid - totalExpense;
+    final totalPaid = _calculateTotalPaidAmount();
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: difference.abs() < 0.01 ? Colors.green[50] : Colors.orange[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: difference.abs() < 0.01
-              ? Colors.green[200]!
-              : Colors.orange[200]!,
+        gradient: LinearGradient(
+          colors: [Colors.green[50]!, Colors.green[100]!],
         ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green[300]!, width: 2),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -344,49 +470,47 @@ class _AddExpenseMultiPayerScreenState
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Total Paid:', style: TextStyle(fontSize: 12)),
-              Text(
-                '\$${totalPaid.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.payments, color: Colors.green[700], size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Total Paid by ${_selectedPayers.length} payer(s)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.attach_money, color: Colors.green, size: 24),
+                  Text(
+                    totalPaid.toStringAsFixed(2),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green[900],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          if (difference.abs() >= 0.01)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  difference > 0 ? 'Overpaid' : 'Underpaid',
-                  style: TextStyle(fontSize: 12, color: Colors.orange[700]),
-                ),
-                Text(
-                  '\$${difference.abs().toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.orange[900],
-                  ),
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green[700], size: 20),
-                const SizedBox(width: 4),
-                Text(
-                  'Balanced',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green[700],
-                  ),
-                ),
-              ],
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green,
+              borderRadius: BorderRadius.circular(50),
             ),
+            child: const Icon(
+              Icons.check_circle,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
         ],
       ),
     );
@@ -409,12 +533,17 @@ class _AddExpenseMultiPayerScreenState
                 IconButton(
                   onPressed: () {
                     setState(() {
-                      if (_selectedParticipants.length == widget.group.members.length) {
+                      if (_selectedParticipants.length ==
+                          widget.group.members.length) {
                         _selectedParticipants.clear();
-                        _selectedParticipants.add(widget.group.members.first.id);
+                        _selectedParticipants.add(
+                          widget.group.members.first.id,
+                        );
                       } else {
                         _selectedParticipants.clear();
-                        _selectedParticipants.addAll(widget.group.members.map((m) => m.id));
+                        _selectedParticipants.addAll(
+                          widget.group.members.map((m) => m.id),
+                        );
                       }
                       _calculateEqualSplit();
                     });
@@ -423,8 +552,11 @@ class _AddExpenseMultiPayerScreenState
                     _selectedParticipants.length == widget.group.members.length
                         ? Icons.deselect
                         : Icons.done_all,
+                    color: Colors.teal,
                   ),
-                  tooltip: _selectedParticipants.length == widget.group.members.length
+                  tooltip:
+                      _selectedParticipants.length ==
+                          widget.group.members.length
                       ? 'Deselect All'
                       : 'Select All',
                 ),
@@ -522,12 +654,12 @@ class _AddExpenseMultiPayerScreenState
           ),
           boxShadow: isSelected
               ? [
-            BoxShadow(
-              color: Colors.teal.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ]
+                  BoxShadow(
+                    color: Colors.teal.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
               : null,
         ),
         child: Stack(
@@ -538,7 +670,9 @@ class _AddExpenseMultiPayerScreenState
                 children: [
                   CircleAvatar(
                     radius: 16,
-                    backgroundColor: isSelected ? Colors.white : Colors.teal[100],
+                    backgroundColor: isSelected
+                        ? Colors.white
+                        : Colors.teal[100],
                     child: Text(
                       member.name[0].toUpperCase(),
                       style: TextStyle(
@@ -586,73 +720,6 @@ class _AddExpenseMultiPayerScreenState
       ),
     );
   }
-  Widget _buildParticipantTile(Person member) {
-    final isSelected = _selectedParticipants.contains(member.id);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.teal[50] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected ? Colors.teal : Colors.grey[300]!,
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: CheckboxListTile(
-        value: isSelected,
-        onChanged: (selected) {
-          setState(() {
-            if (selected == true) {
-              _selectedParticipants.add(member.id);
-            } else {
-              if (_selectedParticipants.length > 1) {
-                _selectedParticipants.remove(member.id);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('At least one participant required'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              }
-            }
-            _calculateEqualSplit();
-          });
-        },
-        title: Text(
-          member.name,
-          style: TextStyle(
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? Colors.teal[900] : Colors.grey[800],
-          ),
-        ),
-        subtitle: isSelected
-            ? Text(
-          'Participating',
-          style: TextStyle(
-            color: Colors.teal[700],
-            fontSize: 12,
-          ),
-        )
-            : null,
-        secondary: CircleAvatar(
-          backgroundColor: isSelected ? Colors.teal : Colors.grey[400],
-          child: Text(
-            member.name[0].toUpperCase(),
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        activeColor: Colors.teal,
-        checkColor: Colors.white,
-        controlAffinity: ListTileControlAffinity.trailing,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      ),
-    );
-  }
 
   Widget _buildSplitSection() {
     return Card(
@@ -688,6 +755,11 @@ class _AddExpenseMultiPayerScreenState
                   }
                 });
               },
+              style: SegmentedButton.styleFrom(
+                selectedForegroundColor: Colors.white,
+                selectedBackgroundColor: Colors.teal,
+                foregroundColor: Colors.teal,
+              ),
             ),
             const SizedBox(height: 16),
             if (_splitType == SplitType.custom) ..._buildCustomSplitFields(),
@@ -712,9 +784,12 @@ class _AddExpenseMultiPayerScreenState
           controller: controller,
           decoration: InputDecoration(
             labelText: member.name,
-            prefixIcon: const Icon(Icons.person),
-            suffixIcon: const Icon(Icons.attach_money),
+            prefixIcon: const Icon(Icons.person, color: Colors.teal),
+            suffixIcon: const Icon(Icons.attach_money, color: Colors.teal),
             border: const OutlineInputBorder(),
+            focusedBorder: const OutlineInputBorder(
+              borderSide: BorderSide(color: Colors.teal, width: 2),
+            ),
           ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           validator: (value) {
@@ -735,7 +810,7 @@ class _AddExpenseMultiPayerScreenState
       (sum, id) => sum + (double.tryParse(_splitControllers[id]!.text) ?? 0.0),
     );
 
-    final totalExpense = double.tryParse(_amountController.text) ?? 0.0;
+    final totalExpense = _calculateTotalPaidAmount();
     final difference = totalSplit - totalExpense;
 
     return Container(
@@ -747,6 +822,7 @@ class _AddExpenseMultiPayerScreenState
           color: difference.abs() < 0.01
               ? Colors.green[200]!
               : Colors.red[200]!,
+          width: 2,
         ),
       ),
       child: Row(
@@ -804,6 +880,8 @@ class _AddExpenseMultiPayerScreenState
   }
 
   Widget _buildSummarySection() {
+    final totalAmount = _calculateTotalPaidAmount();
+
     return Card(
       color: Colors.blue[50],
       child: Padding(
@@ -824,7 +902,7 @@ class _AddExpenseMultiPayerScreenState
             const SizedBox(height: 12),
             _buildSummaryRow(
               'Total Expense',
-              '\$${(double.tryParse(_amountController.text) ?? 0.0).toStringAsFixed(2)}',
+              '\$${totalAmount.toStringAsFixed(2)}',
             ),
             _buildSummaryRow('Paid by ${_selectedPayers.length} person(s)', ''),
             _buildSummaryRow(
@@ -854,7 +932,7 @@ class _AddExpenseMultiPayerScreenState
   void _calculateEqualSplit() {
     if (_selectedParticipants.isEmpty) return;
 
-    final totalAmount = double.tryParse(_amountController.text) ?? 0.0;
+    final totalAmount = _calculateTotalPaidAmount();
     final splitAmount = totalAmount / _selectedParticipants.length;
 
     for (var participantId in _selectedParticipants) {
@@ -865,25 +943,33 @@ class _AddExpenseMultiPayerScreenState
   }
 
   void _autoDistributePayers() {
-    if (_selectedPayers.isEmpty) {
-      // Select all participants as payers
-      setState(() {
+    setState(() {
+      if (_selectedPayers.isEmpty) {
+        // Select all participants as payers
         _selectedPayers.addAll(_selectedParticipants);
-      });
-    }
+      }
 
-    final totalAmount = double.tryParse(_amountController.text) ?? 0.0;
-    if (totalAmount <= 0 || _selectedPayers.isEmpty) return;
+      final totalAmount = _calculateTotalPaidAmount();
+      if (totalAmount <= 0 && _selectedPayers.isNotEmpty) {
+        // If no amounts entered yet, set equal amounts (default 100)
+        final equalAmount = 100.0 / _selectedPayers.length;
+        for (var payerId in _selectedPayers) {
+          _payerAmountControllers[payerId]!.text = equalAmount.toStringAsFixed(
+            2,
+          );
+        }
+      } else if (_selectedPayers.isNotEmpty) {
+        // Redistribute existing total among payers
+        final amountPerPayer = totalAmount / _selectedPayers.length;
+        for (var payerId in _selectedPayers) {
+          _payerAmountControllers[payerId]!.text = amountPerPayer
+              .toStringAsFixed(2);
+        }
+      }
 
-    final amountPerPayer = totalAmount / _selectedPayers.length;
-
-    for (var payerId in _selectedPayers) {
-      _payerAmountControllers[payerId]!.text = amountPerPayer.toStringAsFixed(
-        2,
-      );
-    }
-
-    setState(() {});
+      // Recalculate splits
+      _calculateEqualSplit();
+    });
   }
 
   Future<void> _selectDate() async {
@@ -892,6 +978,18 @@ class _AddExpenseMultiPayerScreenState
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.teal,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {
@@ -905,7 +1003,7 @@ class _AddExpenseMultiPayerScreenState
     if (_selectedPayers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one payer'),
+          content: Text('Please select at least one payer and enter amounts'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -922,18 +1020,13 @@ class _AddExpenseMultiPayerScreenState
       return;
     }
 
-    // Validate total paid equals total expense
-    final totalPaid = _selectedPayers.fold<double>(
-      0.0,
-      (sum, id) =>
-          sum + (double.tryParse(_payerAmountControllers[id]!.text) ?? 0.0),
-    );
-    final totalExpense = double.parse(_amountController.text);
+    // Calculate total from paid amounts
+    final totalExpense = _calculateTotalPaidAmount();
 
-    if ((totalPaid - totalExpense).abs() >= 0.01) {
+    if (totalExpense <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Total paid must equal total expense'),
+          content: Text('Please enter valid payment amounts'),
           backgroundColor: Colors.red,
         ),
       );
@@ -948,9 +1041,12 @@ class _AddExpenseMultiPayerScreenState
 
     if ((totalSplit - totalExpense).abs() >= 0.01) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Total split must equal total expense'),
+        SnackBar(
+          content: Text(
+            'Total split (\$${totalSplit.toStringAsFixed(2)}) must equal total expense (\$${totalExpense.toStringAsFixed(2)})',
+          ),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
         ),
       );
       return;
@@ -993,12 +1089,30 @@ class _AddExpenseMultiPayerScreenState
     final provider = Provider.of<ExpenseProvider>(context, listen: false);
 
     if (widget.expense == null) {
+      // Adding new expense
       provider.addExpense(expense);
-    } else {
-      provider.updateExpense(expense);
-    }
+      Navigator.pop(context, true); // Return true to indicate success
 
-    Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Expense added successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else {
+      // Updating existing expense
+      provider.updateExpense(expense);
+      Navigator.pop(context, expense); // Return updated expense
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Expense updated successfully'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }
 

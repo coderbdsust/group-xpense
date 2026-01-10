@@ -92,6 +92,15 @@ class ExpenseProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> updateMemberName(
+    String groupId,
+    String memberId,
+    String newName,
+  ) async {
+    await _db.updateMemberName(groupId, memberId, newName);
+    notifyListeners();
+  }
+
   // Updated to accept groupId parameter
   Future<Map<String, Map<String, double>>> calculateBalances(
     String groupId,

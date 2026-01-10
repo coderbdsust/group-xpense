@@ -30,18 +30,51 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   void _addMember() {
     if (_memberNameController.text.trim().isEmpty) return;
 
+    // Check for duplicate names
+    final newName = _memberNameController.text.trim();
+    final isDuplicate = _members.any(
+          (m) => m.name.toLowerCase() == newName.toLowerCase(),
+    );
+
+    if (isDuplicate) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A member with this name already exists'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _members.add(
-        Person(id: const Uuid().v4(), name: _memberNameController.text.trim()),
+        Person(id: const Uuid().v4(), name: newName),
       );
       _memberNameController.clear();
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$newName added'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 1),
+      ),
+    );
   }
 
   void _removeMember(int index) {
+    final memberName = _members[index].name;
     setState(() {
       _members.removeAt(index);
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$memberName removed'),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 1),
+      ),
+    );
   }
 
   void _saveGroup() {
@@ -67,6 +100,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       );
 
       Provider.of<ExpenseProvider>(context, listen: false).addGroup(group);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Group created successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
       Navigator.pop(context);
     }
   }
@@ -77,143 +118,248 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       appBar: AppBar(title: const Text('Create Group')),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: Column(
           children: [
-            Card(
-              child: Padding(
+            Expanded(
+              child: ListView(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Group Details',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                children: [
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Group Details',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: InputDecoration(
+                              labelText: 'Group Name',
+                              hintText: 'e.g., Trip to Bali',
+                              prefixIcon: const Icon(Icons.group, color: Colors.teal),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Colors.teal,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter a group name';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _descriptionController,
+                            decoration: InputDecoration(
+                              labelText: 'Description (Optional)',
+                              hintText: 'e.g., Vacation expenses',
+                              prefixIcon: const Icon(
+                                Icons.description,
+                                color: Colors.teal,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Colors.teal,
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                            maxLines: 2,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: InputDecoration(
-                        labelText: 'Group Name',
-                        hintText: 'e.g., Trip to Bali',
-                        prefixIcon: const Icon(Icons.group),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter a group name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: InputDecoration(
-                        labelText: 'Description (Optional)',
-                        hintText: 'e.g., Vacation expenses',
-                        prefixIcon: const Icon(Icons.description),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Add Members',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Add Members',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal[50],
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.teal),
+                                ),
+                                child: Text(
+                                  '${_members.length}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.teal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // TextField
+                          TextField(
                             controller: _memberNameController,
                             decoration: InputDecoration(
                               labelText: 'Member Name',
                               hintText: 'Enter name',
-                              prefixIcon: const Icon(Icons.person_add),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              prefixIcon: const Icon(
+                                Icons.person_add,
+                                color: Colors.teal,
                               ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                  color: Colors.teal,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
                             ),
                             onSubmitted: (_) => _addMember(),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _addMember,
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                          ),
-                          child: const Text('Add'),
-                        ),
-                      ],
-                    ),
-                    if (_members.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _members.length,
-                        itemBuilder: (context, index) {
-                          final member = _members[index];
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.teal[100],
-                              child: Text(
-                                member.name[0].toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.teal,
-                                  fontWeight: FontWeight.bold,
+
+                          const SizedBox(height: 12),
+
+                          // Add Button - Full Width
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _addMember,
+                              icon: const Icon(Icons.add, size: 20),
+                              label: const Text('Add Member'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
+                                elevation: 2,
                               ),
                             ),
-                            title: Text(member.name),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline),
-                              color: Colors.red,
-                              onPressed: () => _removeMember(index),
+                          ),
+
+                          if (_members.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            const Divider(),
+                            const SizedBox(height: 8),
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _members.length,
+                              itemBuilder: (context, index) {
+                                final member = _members[index];
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  color: Colors.teal[50],
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: Colors.teal,
+                                      child: Text(
+                                        member.name[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      member.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    trailing: IconButton(
+                                      icon: const Icon(Icons.delete_outline),
+                                      color: Colors.red,
+                                      onPressed: () => _removeMember(index),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                  ),
+                  const SizedBox(height: 80), // Space for bottom button
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _saveGroup,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+
+            // Bottom Create Button
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
               ),
-              child: const Text('Create Group', style: TextStyle(fontSize: 16)),
+              child: SafeArea(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _saveGroup,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(0),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Create Group',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
