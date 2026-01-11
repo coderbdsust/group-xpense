@@ -20,6 +20,11 @@ dependencies:
   path_provider: ^2.1.1
   share_plus: ^7.2.1
   file_picker: ^8.0.0+1
+  pdf: ^3.10.7
+  open_file: ^3.3.2
+  excel: ^4.0.2
+  image_picker: ^1.0.4
+  permission_handler: ^11.0.1
 
 dev_dependencies:
   flutter_test:

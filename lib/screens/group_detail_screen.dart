@@ -3,9 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/expense_provider.dart';
 import '../models/group.dart';
 import '../models/expense.dart';
+import '../services/export_service.dart';
 import 'expense_detail_screen.dart';
 import 'reports_screen.dart';
 import 'edit_group_screen.dart';
@@ -69,12 +71,139 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
     }
   }
 
+  void _showExportOptions() {
+    // Directly export to PDF without showing options
+    _exportToPdf();
+  }
+
+  Future<void> _exportToPdf() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Generating PDF...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Get expenses and provider
+      final provider = Provider.of<ExpenseProvider>(context, listen: false);
+      final expenses = await provider.getGroupExpenses(widget.group.id);
+
+      // Generate PDF with provider
+      final filePath = await ExportService.exportToPdf(
+        widget.group,
+        expenses,
+        provider,
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      // Show success and share
+      if (mounted) {
+        final result = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 12),
+                Text('PDF Generated'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Your PDF has been generated successfully.'),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.folder, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          filePath,
+                          style: const TextStyle(fontSize: 12),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Close'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.share),
+                label: const Text('Share'),
+              ),
+            ],
+          ),
+        );
+
+        if (result == true) {
+          await Share.shareXFiles(
+            [XFile(filePath)],
+            subject: '${widget.group.name} - Expense Report',
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog if open
+      if (mounted) Navigator.pop(context);
+
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating PDF: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.group.name),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.download, color: Colors.white),
+            tooltip: 'Export',
+            onPressed: _showExportOptions,
+          ),
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.white),
             tooltip: 'Edit Group',

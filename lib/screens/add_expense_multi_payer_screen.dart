@@ -972,7 +972,7 @@ class _AddExpenseMultiPayerScreenState
     });
   }
 
-  Future<void> _selectDate() async {
+  Future<void> _selectDate() async{
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,

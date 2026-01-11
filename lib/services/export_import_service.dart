@@ -81,8 +81,9 @@ class ExportImportService {
       String groupName,
       ) async {
     final data = await exportGroupToJson(groupId);
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final fileName = '${groupName.replaceAll(' ', '_')}_$timestamp.json';
+    // Use ISO 8601 date format: YYYY-MM-DDTHH-MM-SS
+    final isoDate = DateTime.now().toIso8601String().replaceAll(':', '-').split('.')[0];
+    final fileName = '${groupName.replaceAll(' ', '_')}_$isoDate.json';
 
     return await saveToLocalFileSystem(data, fileName);
   }
@@ -90,8 +91,9 @@ class ExportImportService {
   // Export all groups to local file system
   static Future<File> exportAllGroupsToFile() async {
     final data = await exportAllGroupsToJson();
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final fileName = 'group_xpense_backup_$timestamp.json';
+    // Use ISO 8601 date format: YYYY-MM-DDTHH-MM-SS
+    final isoDate = DateTime.now().toIso8601String().replaceAll(':', '-').split('.')[0];
+    final fileName = 'group_xpense_backup_$isoDate.json';
 
     return await saveToLocalFileSystem(data, fileName);
   }

@@ -8,16 +8,13 @@ class Expense {
   final String groupId;
   final String description;
   final double amount;
-
-  // Changed from single payer to multiple payers
-  final List<PayerShare> payers; // Multiple people can pay
-
+  final List<PayerShare> payers;
   final List<Person> participants;
   final Map<String, double> splits;
   final DateTime date;
   final String? category;
   final String? notes;
-  final bool isSettlement; // New field to mark settlement expenses
+  final bool isSettlement;
 
   Expense({
     required this.id,

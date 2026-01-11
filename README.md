@@ -525,33 +525,31 @@ Import:
 ## 🐛 Troubleshooting
 
 ### Biometric Authentication Issues
-**Problem**: Biometric prompt not showing  
+**Problem**: Biometric prompt not showing
 **Solution**: Ensure device has biometrics enabled and app has permission
 
 ### Import/Export Issues
-**Problem**: Backup file not importing  
+**Problem**: Backup file not importing
 **Solution**: Check file version matches app version (2.1.0)
 
-**Problem**: Duplicate groups after import  
+**Problem**: Duplicate groups after import
 **Solution**: App automatically skips duplicates - this is expected behavior
 
 ### Database Issues
-**Problem**: UNIQUE constraint failed  
+**Problem**: UNIQUE constraint failed
 **Solution**: Fixed in v2.1.0 - update to latest version
 
-**Problem**: Expenses not showing  
+**Problem**: Expenses not showing
 **Solution**: Pull to refresh or restart app
 
 ### Currency Display Issues
-**Problem**: Currency not updating  
+**Problem**: Currency not updating
 **Solution**: Change currency in settings and restart app
 
 ## 📈 Roadmap & Future Enhancements
 
 ### Planned Features
 - [ ] Cloud backup and sync (optional)
-- [ ] Export to PDF/Excel
-- [ ] Receipt photo attachments
 - [ ] Dark mode theme
 - [ ] Recurring expenses
 - [ ] Budget limits and alerts
