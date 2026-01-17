@@ -276,6 +276,98 @@ class _ExpensesTabState extends State<_ExpensesTab>
   @override
   bool get wantKeepAlive => true;
 
+  Future<void> _deleteExpense(BuildContext context, Expense expense) async {
+    final provider = Provider.of<ExpenseProvider>(context, listen: false);
+
+    // Check if there are any settlements in the group
+    final settlements = await provider.getSettlements(widget.group.id);
+    final hasSettlements = settlements.isNotEmpty;
+
+    // Find if this expense is before the first settlement
+    bool canDelete = true;
+    String? blockReason;
+
+    if (hasSettlements) {
+      // Get the date of the earliest settlement
+      final earliestSettlement = settlements.reduce((a, b) =>
+        a.date.isBefore(b.date) ? a : b
+      );
+
+      // If the expense is before or on the settlement date, it cannot be deleted
+      if (expense.date.isBefore(earliestSettlement.date) ||
+          expense.date.isAtSameMomentAs(earliestSettlement.date)) {
+        canDelete = false;
+        blockReason = 'This expense cannot be deleted because settlements have been recorded after it. '
+                      'Deleting it would affect settled balances.';
+      }
+    }
+
+    if (!canDelete && mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cannot Delete Expense'),
+          content: Text(blockReason ?? 'This expense cannot be deleted.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Expense'),
+        content: Text(
+          'Are you sure you want to delete "${expense.description}"?\n\n'
+          'Amount: ${expense.amount.toStringAsFixed(2)}\n'
+          'Date: ${DateFormat('MMM dd, yyyy').format(expense.date)}'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await provider.deleteExpense(expense.id, widget.group.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Expense deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          setState(() {});
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete expense: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -371,6 +463,7 @@ class _ExpensesTabState extends State<_ExpensesTab>
                         setState(() {});
                       });
                     },
+                    onDelete: () => _deleteExpense(context, expense),
                   );
                 },
               ),
@@ -386,8 +479,14 @@ class _ExpenseCard extends StatelessWidget {
   final Expense expense;
   final Group group;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
 
-  const _ExpenseCard({required this.expense, required this.group, this.onTap});
+  const _ExpenseCard({
+    required this.expense,
+    required this.group,
+    this.onTap,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -468,13 +567,26 @@ class _ExpenseCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  CurrencyText(
-                    amount: expense.amount,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: displayColor,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      CurrencyText(
+                        amount: expense.amount,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: displayColor,
+                        ),
+                      ),
+                      if (onDelete != null)
+                        IconButton(
+                          icon: const Icon(Icons.delete, size: 20),
+                          color: Colors.red[400],
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: onDelete,
+                        ),
+                    ],
                   ),
                 ],
               ),
