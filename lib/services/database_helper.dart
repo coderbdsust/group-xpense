@@ -24,7 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2, // Updated version for migration
+      version: 3, // Updated version for createdAt migration
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -65,6 +65,7 @@ class DatabaseHelper {
         category TEXT,
         notes TEXT,
         isSettlement INTEGER DEFAULT 0,
+        createdAt TEXT NOT NULL,
         FOREIGN KEY (groupId) REFERENCES groups (id) ON DELETE CASCADE
       )
     ''');
@@ -116,14 +117,18 @@ class DatabaseHelper {
     await db.execute('''
       CREATE INDEX idx_expenses_date ON expenses(date)
     ''');
+
+    await db.execute('''
+      CREATE INDEX idx_expenses_createdAt ON expenses(createdAt)
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      // Check if columns exist before adding
-      final tableInfo = await db.rawQuery('PRAGMA table_info(expenses)');
-      final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
+    // Check if columns exist before adding
+    final tableInfo = await db.rawQuery('PRAGMA table_info(expenses)');
+    final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
 
+    if (oldVersion < 2) {
       // Add notes column if it doesn't exist
       if (!columnNames.contains('notes')) {
         await db.execute('ALTER TABLE expenses ADD COLUMN notes TEXT');
@@ -166,6 +171,26 @@ class DatabaseHelper {
             'amount': amount,
           });
         }
+      }
+    }
+
+    if (oldVersion < 3) {
+      // Add createdAt column if it doesn't exist
+      if (!columnNames.contains('createdAt')) {
+        // Add the column with a default value
+        await db.execute('ALTER TABLE expenses ADD COLUMN createdAt TEXT');
+
+        // Update existing records to use their date as createdAt
+        await db.execute('''
+          UPDATE expenses
+          SET createdAt = date
+          WHERE createdAt IS NULL
+        ''');
+
+        // Create index for createdAt for better performance
+        await db.execute('''
+          CREATE INDEX IF NOT EXISTS idx_expenses_createdAt ON expenses(createdAt)
+        ''');
       }
     }
   }
@@ -369,6 +394,7 @@ class DatabaseHelper {
         'category': expense.category,
         'notes': expense.notes,
         'isSettlement': expense.isSettlement ? 1 : 0,
+        'createdAt': expense.createdAt.toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
 
       // Delete existing related records first to avoid duplicates
@@ -432,6 +458,7 @@ class DatabaseHelper {
           'category': expense.category,
           'notes': expense.notes,
           'isSettlement': expense.isSettlement ? 1 : 0,
+          'createdAt': expense.createdAt.toIso8601String(),
         },
         where: 'id = ?',
         whereArgs: [expense.id],
@@ -486,7 +513,7 @@ class DatabaseHelper {
       'expenses',
       where: 'groupId = ?',
       whereArgs: [groupId],
-      orderBy: 'date DESC',
+      orderBy: 'createdAt DESC',
     );
 
     final group = await getGroup(groupId);
@@ -569,6 +596,9 @@ class DatabaseHelper {
           category: expenseMap['category'] as String?,
           notes: expenseMap['notes'] as String?,
           isSettlement: (expenseMap['isSettlement'] as int?) == 1,
+          createdAt: expenseMap['createdAt'] != null
+              ? DateTime.parse(expenseMap['createdAt'] as String)
+              : DateTime.parse(expenseMap['date'] as String),
         ),
       );
     }
@@ -658,6 +688,9 @@ class DatabaseHelper {
       category: expenseMap['category'] as String?,
       notes: expenseMap['notes'] as String?,
       isSettlement: (expenseMap['isSettlement'] as int?) == 1,
+      createdAt: expenseMap['createdAt'] != null
+          ? DateTime.parse(expenseMap['createdAt'] as String)
+          : DateTime.parse(expenseMap['date'] as String),
     );
   }
 

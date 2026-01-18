@@ -67,6 +67,74 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
   }
 
   Future<void> _editExpense() async {
+    final provider = Provider.of<ExpenseProvider>(context, listen: false);
+
+    // Check if this is a settlement - settlements cannot be edited
+    if (_currentExpense.isSettlement) {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Cannot Edit Settlement'),
+          content: const Text(
+            'Settlements cannot be edited once recorded. '
+            'This protects the integrity of your financial records.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Check if there are any settlements in the group
+    final settlements = await provider.getSettlements(widget.group.id);
+    final hasSettlements = settlements.isNotEmpty;
+
+    // Find if this expense is before the first settlement
+    bool canEdit = true;
+    String? blockReason;
+
+    if (hasSettlements) {
+      // Get the earliest settlement by creation time
+      final earliestSettlement = settlements.reduce(
+        (a, b) => a.createdAt.isBefore(b.createdAt) ? a : b,
+      );
+
+      // If the expense was created before or at the same time as the settlement, it cannot be edited
+      if (_currentExpense.createdAt.isBefore(earliestSettlement.createdAt) ||
+          _currentExpense.createdAt.isAtSameMomentAs(earliestSettlement.createdAt)) {
+        canEdit = false;
+        blockReason =
+            'This expense cannot be edited because settlements have been recorded after it. '
+            'Editing it would affect settled balances.';
+      }
+    }
+
+    if (!canEdit) {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Cannot Edit Expense'),
+          content: Text(blockReason ?? 'This expense cannot be edited.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Proceed with editing if allowed
+    if (!mounted) return;
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -139,8 +207,19 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
               const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
               const SizedBox(width: 8),
               Text(
-                DateFormat('EEEE, MMMM dd, yyyy').format(expense.date),
+                'Expense Date: ${DateFormat('EEEE, MMMM dd, yyyy').format(expense.date)}',
                 style: const TextStyle(fontSize: 14, color: Colors.white70),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.access_time, color: Colors.white60, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                'Created: ${DateFormat('MMM dd, yyyy HH:mm').format(expense.createdAt)}',
+                style: const TextStyle(fontSize: 13, color: Colors.white60),
               ),
             ],
           ),
@@ -510,44 +589,123 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
     );
   }
 
-  void _deleteExpense(BuildContext context) {
-    showDialog(
+  Future<void> _deleteExpense(BuildContext context) async {
+    final provider = Provider.of<ExpenseProvider>(context, listen: false);
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    // Check if this is a settlement - settlements cannot be deleted
+    if (_currentExpense.isSettlement) {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Cannot Delete Settlement'),
+          content: const Text(
+            'Settlements cannot be deleted once recorded. '
+            'This protects the integrity of your financial records.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Check if there are any settlements in the group
+    final settlements = await provider.getSettlements(widget.group.id);
+    final hasSettlements = settlements.isNotEmpty;
+
+    // Find if this expense is before the first settlement
+    bool canDelete = true;
+    String? blockReason;
+
+    if (hasSettlements) {
+      // Get the earliest settlement by creation time
+      final earliestSettlement = settlements.reduce(
+        (a, b) => a.createdAt.isBefore(b.createdAt) ? a : b,
+      );
+
+      // If the expense was created before or at the same time as the settlement, it cannot be deleted
+      if (_currentExpense.createdAt.isBefore(earliestSettlement.createdAt) ||
+          _currentExpense.createdAt.isAtSameMomentAs(earliestSettlement.createdAt)) {
+        canDelete = false;
+        blockReason =
+            'This expense cannot be deleted because settlements have been recorded after it. '
+            'Deleting it would affect settled balances.';
+      }
+    }
+
+    if (!canDelete) {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Cannot Delete Expense'),
+          content: Text(blockReason ?? 'This expense cannot be deleted.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Show confirmation dialog
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Expense'),
-        content: const Text('Are you sure you want to delete this expense?'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete'),
+        content: Text(
+          'Are you sure you want to delete "${_currentExpense.description}"?\n\n'
+          'Amount: ${_currentExpense.amount.toStringAsFixed(2)}\n'
+          'Date: ${DateFormat('MMM dd, yyyy').format(_currentExpense.date)}',
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              final provider = Provider.of<ExpenseProvider>(
-                context,
-                listen: false,
-              );
-              // Pass both expenseId and groupId
-              provider.deleteExpense(
-                _currentExpense.id,
-                _currentExpense.groupId,
-              );
-
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close detail screen
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Expense deleted successfully'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            },
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete'),
           ),
         ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    // Perform deletion
+    try {
+      await provider.deleteExpense(_currentExpense.id, widget.group.id);
+      if (mounted) {
+        navigator.pop(); // Close detail screen
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text('Expense deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete expense: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

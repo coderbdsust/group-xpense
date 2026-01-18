@@ -19,7 +19,7 @@ A beautiful and intuitive Flutter application for managing group expenses with m
 </div>
 
 <div align="center">
-  <img src="screenshots/003-00.png" alt="Group Details" width="30%"/>
+  <img src="screenshots/003-05.png" alt="Group Details" width="30%"/>
   <img src="screenshots/003-01.png" alt="Expenses Tab-01" width="30%"/>
   <img src="screenshots/003-02.png" alt="Expenses Tab-02" width="30%"/>
 </div>

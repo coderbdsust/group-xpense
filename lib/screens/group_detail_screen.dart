@@ -169,10 +169,9 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
         );
 
         if (result == true) {
-          await Share.shareXFiles(
-            [XFile(filePath)],
-            subject: '${widget.group.name} - Expense Report',
-          );
+          await Share.shareXFiles([
+            XFile(filePath),
+          ], subject: '${widget.group.name} - Expense Report');
         }
       }
     } catch (e) {
@@ -191,7 +190,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen>
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -278,6 +276,29 @@ class _ExpensesTabState extends State<_ExpensesTab>
 
   Future<void> _deleteExpense(BuildContext context, Expense expense) async {
     final provider = Provider.of<ExpenseProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    // Check if this is a settlement - settlements cannot be deleted
+    if (expense.isSettlement) {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Cannot Delete Settlement'),
+          content: const Text(
+            'Settlements cannot be deleted once recorded. '
+            'This protects the integrity of your financial records.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     // Check if there are any settlements in the group
     final settlements = await provider.getSettlements(widget.group.id);
@@ -288,29 +309,31 @@ class _ExpensesTabState extends State<_ExpensesTab>
     String? blockReason;
 
     if (hasSettlements) {
-      // Get the date of the earliest settlement
-      final earliestSettlement = settlements.reduce((a, b) =>
-        a.date.isBefore(b.date) ? a : b
+      // Get the earliest settlement by creation time
+      final earliestSettlement = settlements.reduce(
+        (a, b) => a.createdAt.isBefore(b.createdAt) ? a : b,
       );
 
-      // If the expense is before or on the settlement date, it cannot be deleted
-      if (expense.date.isBefore(earliestSettlement.date) ||
-          expense.date.isAtSameMomentAs(earliestSettlement.date)) {
+      // If the expense was created before or at the same time as the settlement, it cannot be deleted
+      if (expense.createdAt.isBefore(earliestSettlement.createdAt) ||
+          expense.createdAt.isAtSameMomentAs(earliestSettlement.createdAt)) {
         canDelete = false;
-        blockReason = 'This expense cannot be deleted because settlements have been recorded after it. '
-                      'Deleting it would affect settled balances.';
+        blockReason =
+            'This expense cannot be deleted because settlements have been recorded after it. '
+            'Deleting it would affect settled balances.';
       }
     }
 
-    if (!canDelete && mounted) {
-      showDialog(
+    if (!canDelete) {
+      if (!mounted) return;
+      await showDialog(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (dialogContext) => AlertDialog(
           title: const Text('Cannot Delete Expense'),
           content: Text(blockReason ?? 'This expense cannot be deleted.'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('OK'),
             ),
           ],
@@ -320,22 +343,23 @@ class _ExpensesTabState extends State<_ExpensesTab>
     }
 
     // Show confirmation dialog
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Expense'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete'),
         content: Text(
           'Are you sure you want to delete "${expense.description}"?\n\n'
           'Amount: ${expense.amount.toStringAsFixed(2)}\n'
-          'Date: ${DateFormat('MMM dd, yyyy').format(expense.date)}'
+          'Date: ${DateFormat('MMM dd, yyyy').format(expense.date)}',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete'),
           ),
@@ -343,27 +367,27 @@ class _ExpensesTabState extends State<_ExpensesTab>
       ),
     );
 
-    if (confirmed == true && mounted) {
-      try {
-        await provider.deleteExpense(expense.id, widget.group.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Expense deleted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          setState(() {});
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to delete expense: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+    if (confirmed != true) return;
+
+    try {
+      await provider.deleteExpense(expense.id, widget.group.id);
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text('Expense deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete expense: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -520,31 +544,28 @@ class _ExpenseCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                expense.description,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        if (isSettlement)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
                             ),
-                            if (isSettlement)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
+                            decoration: BoxDecoration(
+                              color: Colors.purple[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.purple[200]!),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.handshake,
+                                  size: 12,
+                                  color: Colors.purple[700],
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.purple[50],
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.purple[200]!,
-                                  ),
-                                ),
-                                child: Text(
+                                const SizedBox(width: 4),
+                                Text(
                                   'SETTLEMENT',
                                   style: TextStyle(
                                     color: Colors.purple[700],
@@ -552,42 +573,82 @@ class _ExpenseCard extends StatelessWidget {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          DateFormat('MMM dd, yyyy').format(expense.date),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13,
+                              ],
+                            ),
                           ),
+                        Text(
+                          isSettlement
+                              ? expense.description.replaceFirst(
+                                  'Settlement: ',
+                                  '',
+                                )
+                              : expense.description,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              size: 12,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              DateFormat('MMM dd, yyyy').format(expense.date),
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      CurrencyText(
-                        amount: expense.amount,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: displayColor,
-                        ),
-                      ),
-                      if (onDelete != null)
-                        IconButton(
-                          icon: const Icon(Icons.delete, size: 20),
-                          color: Colors.red[400],
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: onDelete,
-                        ),
-                    ],
+                  CurrencyText(
+                    amount: expense.amount,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: displayColor,
+                    ),
                   ),
+                  if (onDelete != null)
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: Colors.grey[600],
+                        size: 20,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      onSelected: (value) {
+                        if (value == 'delete') {
+                          onDelete?.call();
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red, size: 20),
+                              SizedBox(width: 12),
+                              Text(
+                                'Delete',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
               const Divider(height: 20),
@@ -673,6 +734,22 @@ class _ExpenseCard extends StatelessWidget {
                   Text(
                     '${expense.participants.length} participant${expense.participants.length > 1 ? 's' : ''}',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(Icons.access_time, size: 11, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Created: ${DateFormat('MMM dd, yyyy HH:mm').format(expense.createdAt)}',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ),

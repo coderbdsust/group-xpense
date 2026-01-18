@@ -3,11 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/currency_service.dart';
 import '../services/biometric_service.dart';
-import '../utils/privacy_policy.dart';
 import 'privacy_policy_screen.dart';
 import 'export_import_screen.dart';
 import '../utils/app_constants.dart';
-
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -15,9 +13,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
           _SecuritySection(),
@@ -69,31 +65,31 @@ class _SecuritySection extends StatelessWidget {
               activeColor: Colors.teal,
               onChanged: isAvailable
                   ? (value) async {
-                try {
-                  await settingsProvider.toggleBiometric(value);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          value
-                              ? 'Biometric authentication enabled'
-                              : 'Biometric authentication disabled',
-                        ),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(e.toString()),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              }
+                      try {
+                        await settingsProvider.toggleBiometric(value);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                value
+                                    ? 'Biometric authentication enabled'
+                                    : 'Biometric authentication disabled',
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.toString()),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    }
                   : null,
             );
           },
@@ -161,10 +157,7 @@ class _CurrencySection extends StatelessWidget {
     );
   }
 
-  void _showCurrencyPicker(
-      BuildContext context,
-      SettingsProvider provider,
-      ) {
+  void _showCurrencyPicker(BuildContext context, SettingsProvider provider) {
     final currencies = CurrencyService.getAllCurrencies();
 
     showModalBottomSheet(
@@ -202,8 +195,9 @@ class _CurrencySection extends StatelessWidget {
 
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundColor:
-                      isSelected ? Colors.teal : Colors.grey[200],
+                      backgroundColor: isSelected
+                          ? Colors.teal
+                          : Colors.grey[200],
                       child: Text(
                         currency['symbol']!,
                         style: TextStyle(
@@ -213,7 +207,9 @@ class _CurrencySection extends StatelessWidget {
                       ),
                     ),
                     title: Text(currency['name']!),
-                    subtitle: Text('${currency['code']} (${currency['symbol']})'),
+                    subtitle: Text(
+                      '${currency['code']} (${currency['symbol']})',
+                    ),
                     trailing: isSelected
                         ? const Icon(Icons.check_circle, color: Colors.teal)
                         : null,
@@ -336,10 +332,7 @@ class _AboutSection extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text(
                     'Split expenses with friends and groups easily. Track who owes what and settle up!',
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      height: 1.5,
-                    ),
+                    style: TextStyle(color: Colors.grey[700], height: 1.5),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -365,10 +358,7 @@ class _AboutSection extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         AppConstants.releaseDate,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 11,
-                        ),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
                       ),
                     ],
                   ),

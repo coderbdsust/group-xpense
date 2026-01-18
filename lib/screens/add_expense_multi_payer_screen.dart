@@ -60,8 +60,23 @@ class _AddExpenseMultiPayerScreenState
 
   void _initializeControllers() {
     for (var member in widget.group.members) {
-      _payerAmountControllers[member.id] = TextEditingController(text: '0.00');
-      _splitControllers[member.id] = TextEditingController(text: '0.00');
+      final payerController = TextEditingController(text: '0.00');
+      // Add listener to update UI when payer amount changes (affects total expense)
+      payerController.addListener(() {
+        setState(() {
+          // Trigger rebuild to update split summary
+        });
+      });
+      _payerAmountControllers[member.id] = payerController;
+
+      final splitController = TextEditingController(text: '0.00');
+      // Add listener to update UI when split amount changes
+      splitController.addListener(() {
+        setState(() {
+          // Trigger rebuild to update split summary
+        });
+      });
+      _splitControllers[member.id] = splitController;
     }
   }
 
@@ -811,69 +826,108 @@ class _AddExpenseMultiPayerScreenState
     );
 
     final totalExpense = _calculateTotalPaidAmount();
-    final difference = totalSplit - totalExpense;
+    final remaining =
+        totalExpense -
+        totalSplit; // Positive = money left to split, Negative = over-allocated
+
+    // Determine if balanced (within 1 cent)
+    final isBalanced = remaining.abs() < 0.01;
+
+    // Determine status color and labels
+    final bool isRemaining = remaining > 0.01;
+
+    final statusColor = isBalanced
+        ? Colors.green
+        : (isRemaining ? Colors.orange : Colors.red);
+
+    final statusLabel = isBalanced
+        ? 'Balanced'
+        : (isRemaining ? 'Remaining' : 'Over by');
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: difference.abs() < 0.01 ? Colors.green[50] : Colors.red[50],
+        color: statusColor[50],
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: difference.abs() < 0.01
-              ? Colors.green[200]!
-              : Colors.red[200]!,
-          width: 2,
-        ),
+        border: Border.all(color: statusColor[200]!, width: 2),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Total Split:', style: TextStyle(fontSize: 12)),
-              Text(
-                '\$${totalSplit.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          if (difference.abs() >= 0.01)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('Total Split:', style: TextStyle(fontSize: 12)),
                 Text(
-                  'Difference',
-                  style: TextStyle(fontSize: 12, color: Colors.red[700]),
-                ),
-                Text(
-                  '\$${difference.abs().toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 14,
+                  '\$${totalSplit.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.red[900],
-                  ),
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green[700], size: 20),
-                const SizedBox(width: 4),
-                Text(
-                  'Balanced',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green[700],
                   ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  statusLabel,
+                  style: TextStyle(fontSize: 12, color: statusColor[700]),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (isBalanced) ...[
+                      Icon(
+                        Icons.check_circle,
+                        color: statusColor[700],
+                        size: 18,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '\$${remaining.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor[700],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ] else ...[
+                      if (isRemaining)
+                        Icon(
+                          Icons.trending_down,
+                          color: statusColor[700],
+                          size: 18,
+                        )
+                      else
+                        Icon(Icons.warning, color: statusColor[700], size: 18),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '\$${remaining.abs().toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor[900],
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -972,7 +1026,7 @@ class _AddExpenseMultiPayerScreenState
     });
   }
 
-  Future<void> _selectDate() async{
+  Future<void> _selectDate() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,

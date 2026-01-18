@@ -15,6 +15,7 @@ class Expense {
   final String? category;
   final String? notes;
   final bool isSettlement;
+  final DateTime createdAt;
 
   Expense({
     required this.id,
@@ -28,7 +29,8 @@ class Expense {
     this.category,
     this.notes,
     this.isSettlement = false,
-  });
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 
   // Backward compatibility - get primary payer
   Person get paidBy =>
@@ -52,6 +54,7 @@ class Expense {
       'category': category,
       'notes': notes,
       'isSettlement': isSettlement ? 1 : 0,
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
@@ -105,6 +108,9 @@ class Expense {
       category: map['category'] as String?,
       notes: map['notes'] as String?,
       isSettlement: map['isSettlement'] == 1,
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'] as String)
+          : DateTime.parse(map['date'] as String), // Fallback to date for old records
     );
   }
 
@@ -122,6 +128,7 @@ class Expense {
       'category': category,
       'notes': notes,
       'isSettlement': isSettlement,
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
@@ -142,6 +149,9 @@ class Expense {
       category: json['category'] as String?,
       notes: json['notes'] as String?,
       isSettlement: json['isSettlement'] == true,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.parse(json['date'] as String), // Fallback to date for old records
     );
   }
 
@@ -157,6 +167,7 @@ class Expense {
     String? category,
     String? notes,
     bool? isSettlement,
+    DateTime? createdAt,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -170,6 +181,7 @@ class Expense {
       category: category ?? this.category,
       notes: notes ?? this.notes,
       isSettlement: isSettlement ?? this.isSettlement,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 

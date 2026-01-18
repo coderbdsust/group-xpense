@@ -9,7 +9,6 @@ import 'settings_screen.dart';
 import '../widgets/currency_text.dart';
 import '../utils/app_constants.dart';
 
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -72,7 +71,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.teal[50],
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.app_settings_alt, color: Colors.teal, size: 32),
+              child: const Icon(
+                Icons.app_settings_alt,
+                color: Colors.teal,
+                size: 32,
+              ),
             ),
             const SizedBox(width: 12),
             const Text(AppConstants.appName),
@@ -154,24 +157,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...AppConstants.features.map((feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.teal, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        feature,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[700],
+              ...AppConstants.features.map(
+                (feature) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.teal, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          feature,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 16),
 
               // Developer Info
@@ -195,9 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 4),
                     Text(
                       AppConstants.developerName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -306,13 +309,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.group_add, size: 100, color: Colors.teal[200]),
+                        Icon(
+                          Icons.group_add,
+                          size: 100,
+                          color: Colors.teal[200],
+                        ),
                         const SizedBox(height: 24),
                         Text(
                           'No groups yet',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: Colors.grey[700],
-                          ),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(color: Colors.grey[700]),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -448,7 +454,7 @@ class _GroupCard extends StatelessWidget {
                           children: [
                             Icon(Icons.edit, color: Colors.teal, size: 20),
                             SizedBox(width: 12),
-                            Text('Edit Group'),
+                            Text('Edit'),
                           ],
                         ),
                       ),
@@ -458,7 +464,7 @@ class _GroupCard extends StatelessWidget {
                           children: [
                             Icon(Icons.delete, color: Colors.red, size: 20),
                             SizedBox(width: 12),
-                            Text('Delete Group', style: TextStyle(color: Colors.red)),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
@@ -557,7 +563,10 @@ class _GroupCard extends StatelessWidget {
                   backgroundColor: Color(0xFFFFEBEE),
                   child: Icon(Icons.delete, color: Colors.red),
                 ),
-                title: const Text('Delete Group', style: TextStyle(color: Colors.red)),
+                title: const Text(
+                  'Delete Group',
+                  style: TextStyle(color: Colors.red),
+                ),
                 subtitle: const Text('Remove group and all expenses'),
                 onTap: () {
                   Navigator.pop(context);
@@ -574,9 +583,7 @@ class _GroupCard extends StatelessWidget {
   void _editGroup(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EditGroupScreen(group: group),
-      ),
+      MaterialPageRoute(builder: (context) => EditGroupScreen(group: group)),
     );
   }
 
@@ -600,15 +607,16 @@ class _GroupCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
+                  Icon(
+                    Icons.warning_amber,
+                    color: Colors.orange[700],
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'All expenses will be permanently deleted',
-                      style: TextStyle(
-                        color: Colors.orange[900],
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: Colors.orange[900], fontSize: 13),
                     ),
                   ),
                 ],
@@ -624,8 +632,10 @@ class _GroupCard extends StatelessWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              await Provider.of<ExpenseProvider>(context, listen: false)
-                  .deleteGroup(group.id);
+              await Provider.of<ExpenseProvider>(
+                context,
+                listen: false,
+              ).deleteGroup(group.id);
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
