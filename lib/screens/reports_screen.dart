@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/group.dart';
 import '../providers/expense_provider.dart';
+import '../providers/category_provider.dart';
 import '../widgets/currency_text.dart';
 
 class ReportsScreen extends StatelessWidget {
@@ -333,7 +334,7 @@ class _CategoryReportCard extends StatelessWidget {
                 return Column(
                   children: sortedEntries.map((entry) {
                     final percentage = (entry.value / total * 100);
-                    final color = _getCategoryColor(entry.key);
+                    final color = _getCategoryColor(context, entry.key);
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -408,23 +409,9 @@ class _CategoryReportCard extends StatelessWidget {
     );
   }
 
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'Food & Drinks':
-        return Colors.orange;
-      case 'Transportation':
-        return Colors.blue;
-      case 'Entertainment':
-        return Colors.purple;
-      case 'Shopping':
-        return Colors.pink;
-      case 'Utilities':
-        return Colors.amber;
-      case 'Rent':
-        return Colors.green;
-      default:
-        return Colors.teal;
-    }
+  Color _getCategoryColor(BuildContext context, String category) {
+    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    return categoryProvider.getCategoryColor(category);
   }
 }
 

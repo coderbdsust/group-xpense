@@ -5,6 +5,7 @@ import 'package:path/path.dart';
 import '../models/person.dart';
 import '../models/group.dart';
 import '../models/expense.dart';
+import '../models/category.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -24,13 +25,24 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3, // Updated version for createdAt migration
+      version: 4, // Updated version for categories table
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
+    // Categories table
+    await db.execute('''
+      CREATE TABLE categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        iconCodePoint TEXT NOT NULL,
+        colorValue TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
     // Groups table
     await db.execute('''
       CREATE TABLE groups (
@@ -190,6 +202,25 @@ class DatabaseHelper {
         // Create index for createdAt for better performance
         await db.execute('''
           CREATE INDEX IF NOT EXISTS idx_expenses_createdAt ON expenses(createdAt)
+        ''');
+      }
+    }
+
+    if (oldVersion < 4) {
+      // Create categories table if it doesn't exist
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'",
+      );
+
+      if (tables.isEmpty) {
+        await db.execute('''
+          CREATE TABLE categories (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            iconCodePoint TEXT NOT NULL,
+            colorValue TEXT NOT NULL,
+            createdAt TEXT NOT NULL
+          )
         ''');
       }
     }
@@ -698,6 +729,55 @@ class DatabaseHelper {
     final db = await database;
     await db.delete('expenses', where: 'id = ?', whereArgs: [expenseId]);
     // Cascading deletes will handle payers, participants and splits
+  }
+
+  // Category CRUD operations
+  Future<void> insertCategory(Category category) async {
+    final db = await database;
+    await db.insert('categories', category.toMap());
+  }
+
+  Future<List<Category>> getAllCategories() async {
+    final db = await database;
+    final maps = await db.query('categories', orderBy: 'name ASC');
+    return maps.map((map) => Category.fromMap(map)).toList();
+  }
+
+  Future<Category?> getCategoryById(String id) async {
+    final db = await database;
+    final maps = await db.query(
+      'categories',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isEmpty) return null;
+    return Category.fromMap(maps.first);
+  }
+
+  Future<void> updateCategory(Category category) async {
+    final db = await database;
+    await db.update(
+      'categories',
+      category.toMap(),
+      where: 'id = ?',
+      whereArgs: [category.id],
+    );
+  }
+
+  Future<void> deleteCategory(String categoryId) async {
+    final db = await database;
+    await db.delete('categories', where: 'id = ?', whereArgs: [categoryId]);
+  }
+
+  Future<bool> isCategoryInUse(String categoryName) async {
+    final db = await database;
+    final result = await db.query(
+      'expenses',
+      where: 'category = ?',
+      whereArgs: [categoryName],
+      limit: 1,
+    );
+    return result.isNotEmpty;
   }
 
   // Utility methods

@@ -5,6 +5,7 @@ import '../services/currency_service.dart';
 import '../services/biometric_service.dart';
 import 'privacy_policy_screen.dart';
 import 'export_import_screen.dart';
+import 'category_management_screen.dart';
 import '../utils/app_constants.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -19,6 +20,8 @@ class SettingsScreen extends StatelessWidget {
           _SecuritySection(),
           const Divider(height: 32),
           _CurrencySection(),
+          const Divider(height: 32),
+          _CustomizationSection(),
           const Divider(height: 32),
           _DataManagementSection(),
           const Divider(height: 32),
@@ -366,6 +369,41 @@ class _AboutSection extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CustomizationSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Customization',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Colors.teal,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.category, color: Colors.teal),
+          title: const Text('Manage Categories'),
+          subtitle: const Text('Customize expense categories'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CategoryManagementScreen(),
+              ),
+            );
+          },
         ),
       ],
     );

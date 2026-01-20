@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/group.dart';
 import '../models/expense.dart';
+import '../models/category.dart';
 import '../services/database_helper.dart';
 import '../utils/app_constants.dart';
 
@@ -40,12 +41,17 @@ class ExportImportService {
       allGroupsData.add(groupData);
     }
 
+    // Export categories
+    final categories = await _db.getAllCategories();
+    final categoriesData = categories.map((c) => c.toMap()).toList();
+
     return {
       'version': AppConstants.appVersion,
       'exportDate': DateTime.now().toIso8601String(),
       'appName': AppConstants.appName,
       'totalGroups': groups.length,
       'groups': allGroupsData,
+      'categories': categoriesData,
     };
   }
 
@@ -259,6 +265,30 @@ class ExportImportService {
         );
       }
 
+      // Import categories first (if available)
+      int categoriesImported = 0;
+      if (data.containsKey('categories')) {
+        final categoriesData = data['categories'] as List;
+        for (var categoryData in categoriesData) {
+          try {
+            final categoryMap = categoryData as Map<String, dynamic>;
+            final category = Category.fromMap(categoryMap);
+
+            // Check if category already exists
+            final existingCategory = await _db.getCategoryById(category.id);
+            if (existingCategory == null) {
+              await _db.insertCategory(category);
+              categoriesImported++;
+            } else {
+              // Update existing category
+              await _db.updateCategory(category);
+            }
+          } catch (e) {
+            print('Error importing category: $e');
+          }
+        }
+      }
+
       final groupsData = data['groups'] as List;
       int importedCount = 0;
       int updatedCount = 0;
@@ -289,6 +319,12 @@ class ExportImportService {
       }
 
       final messages = <String>[];
+
+      if (categoriesImported > 0) {
+        messages.add(
+          'Imported $categoriesImported categor${categoriesImported > 1 ? 'ies' : 'y'}',
+        );
+      }
 
       if (importedCount > 0) {
         messages.add(

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../providers/expense_provider.dart';
+import '../providers/category_provider.dart';
 import '../models/group.dart';
 import '../models/expense.dart';
 import '../services/export_service.dart';
@@ -517,7 +518,7 @@ class _ExpenseCard extends StatelessWidget {
     final isSettlement = expense.isSettlement;
     final displayIcon = isSettlement
         ? Icons.handshake
-        : _getCategoryIcon(expense.category);
+        : _getCategoryIcon(context, expense.category);
     final displayColor = isSettlement ? Colors.purple : Colors.teal;
 
     return Card(
@@ -760,25 +761,12 @@ class _ExpenseCard extends StatelessWidget {
     );
   }
 
-  IconData _getCategoryIcon(String? category) {
-    switch (category) {
-      case 'Food & Drinks':
-        return Icons.restaurant;
-      case 'Transportation':
-        return Icons.directions_car;
-      case 'Entertainment':
-        return Icons.movie;
-      case 'Shopping':
-        return Icons.shopping_bag;
-      case 'Utilities':
-        return Icons.electrical_services;
-      case 'Rent':
-        return Icons.home;
-      case 'Settlement':
-        return Icons.handshake;
-      default:
-        return Icons.receipt;
+  IconData _getCategoryIcon(BuildContext context, String? category) {
+    if (category == 'Settlement') {
+      return Icons.handshake;
     }
+    final categoryProvider = Provider.of<CategoryProvider>(context, listen: false);
+    return categoryProvider.getCategoryIcon(category);
   }
 }
 

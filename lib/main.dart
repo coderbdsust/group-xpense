@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/expense_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/category_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/biometric_lock_screen.dart';
 import 'screens/privacy_consent_screen.dart';
@@ -28,6 +29,7 @@ class GroupXpenseApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ExpenseProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => CategoryProvider()),
       ],
       child: Consumer<SettingsProvider>(
         builder: (context, settingsProvider, child) {

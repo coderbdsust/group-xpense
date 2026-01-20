@@ -7,6 +7,7 @@ import '../models/group.dart';
 import '../models/person.dart';
 import '../models/expense.dart';
 import '../providers/expense_provider.dart';
+import '../providers/category_provider.dart';
 
 class AddExpenseMultiPayerScreen extends StatefulWidget {
   final Group group;
@@ -41,21 +42,15 @@ class _AddExpenseMultiPayerScreenState
   String? _selectedCategory;
   DateTime _selectedDate = DateTime.now();
 
-  final List<String> _categories = [
-    'Food & Drinks',
-    'Transportation',
-    'Entertainment',
-    'Shopping',
-    'Utilities',
-    'Rent',
-    'Other',
-  ];
-
   @override
   void initState() {
     super.initState();
     _initializeControllers();
     _loadExpenseData();
+    // Load categories
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<CategoryProvider>(context, listen: false).loadCategories();
+    });
   }
 
   void _initializeControllers() {
@@ -248,20 +243,38 @@ class _AddExpenseMultiPayerScreenState
             ),
 
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              decoration: const InputDecoration(
-                labelText: 'Category',
-                prefixIcon: Icon(Icons.category, color: Colors.teal),
-                border: OutlineInputBorder(),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.teal, width: 2),
-                ),
-              ),
-              items: _categories.map((category) {
-                return DropdownMenuItem(value: category, child: Text(category));
-              }).toList(),
-              onChanged: (value) => setState(() => _selectedCategory = value),
+            Consumer<CategoryProvider>(
+              builder: (context, categoryProvider, child) {
+                final categories = categoryProvider.categories;
+                return DropdownButtonFormField<String>(
+                  value: _selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    prefixIcon: Icon(Icons.category, color: Colors.teal),
+                    border: OutlineInputBorder(),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.teal, width: 2),
+                    ),
+                  ),
+                  items: categories.map((category) {
+                    return DropdownMenuItem(
+                      value: category.name,
+                      child: Row(
+                        children: [
+                          Icon(
+                            categoryProvider.getCategoryIcon(category.name),
+                            color: categoryProvider.getCategoryColor(category.name),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(category.name),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) => setState(() => _selectedCategory = value),
+                );
+              },
             ),
             const SizedBox(height: 16),
             InkWell(
