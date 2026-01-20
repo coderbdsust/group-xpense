@@ -75,21 +75,24 @@ A beautiful and intuitive Flutter application for managing group expenses with m
 
 ### 💰 Advanced Expense Tracking
 
-#### Multi-Payer Support (NEW)
+#### Multi-Payer Support
 - **Multiple Payers**: Split payment among multiple people
 - **Auto-Distribution**: Automatically divide amounts equally among payers
+- **Auto-Split Remaining Amount**: Intelligently distributes remaining amounts after equal split
 - **Custom Amounts**: Set specific payment amounts for each payer
 - **Real-time Validation**: Ensures total paid equals total expense
 - **Visual Indicators**: Clear balance summary with color-coded feedback
 
 #### Expense Features
 - ✅ Add/edit/delete expenses with detailed information
+- ✅ Quick delete from expense list with confirmation
 - ✅ Multiple payers per expense
-- ✅ Category classification (Food, Transport, Entertainment, Shopping, Utilities, Rent, Other)
+- ✅ Category classification (Food & Drinks, Transport, Entertainment, Shopping, Utilities, Rent, Other)
 - ✅ Custom date tracking
 - ✅ Notes and additional details
 - ✅ Settlement tracking (mark payments as settlements)
 - ✅ Expense detail view with full information
+- ✅ Edit expense from detail screen
 
 ### 🔀 Smart Splitting
 - **Equal Split**: Automatically divide amounts equally
@@ -109,7 +112,10 @@ A beautiful and intuitive Flutter application for managing group expenses with m
   - Average per expense
   - Per member breakdown
 - **Visual Charts**: Progress bars for category distribution
-- **Export Capabilities**: Share reports and data
+- **Export Capabilities**:
+  - **PDF Reports**: Professional formatted reports with modern gradients
+  - **JSON Backup**: Complete data backup for restore
+  - **Share Options**: Share reports via any app
 
 ### 💳 Balance & Settlement
 - **Who Owes Whom**: Automatic calculation of settlements
@@ -119,14 +125,17 @@ A beautiful and intuitive Flutter application for managing group expenses with m
 - **Settlement Recording**: Track payments with settlement expenses
 - **Balance Validation**: Ensure all payments balance correctly
 
-### 📤 Backup & Restore (NEW)
+### 📤 Backup & Restore
 
 #### Export Features
 - **Single Group Export**: Export individual groups as JSON
 - **Complete Backup**: Export all groups at once
+- **PDF Reports**: Generate detailed expense reports in PDF format
+- **Excel Export**: Export data to Excel spreadsheets for analysis
 - **Local Storage**: Files saved to app documents directory
 - **Share Options**: Share via any app (Email, Drive, Messaging, etc.)
 - **Timestamped Files**: Automatic naming with timestamps
+- **Open Exported Files**: Direct file opening after export
 
 #### Import Features
 - **Browse Device**: File picker to select from anywhere on device
@@ -145,20 +154,24 @@ A beautiful and intuitive Flutter application for managing group expenses with m
 ### 🎯 User Experience
 - **Pull to Refresh**: Swipe down to refresh on all screens
 - **Tap to View**: Tap expenses for full details
+- **Quick Delete**: Delete expenses directly from list with confirmation
 - **Quick Edit**: Edit button in expense details
 - **Confirmation Dialogs**: Prevents accidental deletions
 - **Success Messages**: Clear feedback for all actions
 - **Loading Indicators**: Smooth async operation handling
 - **Three-dot Menus**: Consistent actions across screens
 - **Visual Participant Selection**: Card-based UI for better visibility
+- **Auto-Calculation**: Smart calculation from payer information
+- **Group & Member Rename**: Easy rename functionality
 
 ## 📦 Installation
 
 ### Prerequisites
 - Flutter SDK 3.10.4 or higher
 - Dart SDK 3.10.4 or higher
-- Android Studio / VS Code / Xcode
+- Android Studio / VS Code with Flutter plugin
 - Android SDK (for Android) or Xcode (for iOS)
+- Device with biometric support (optional, for fingerprint/face ID)
 
 ### Steps
 ```bash
@@ -185,12 +198,14 @@ group_xpense/
 │   │   ├── person.dart                     # Person/Member model
 │   │   ├── group.dart                      # Group model
 │   │   ├── expense.dart                    # Expense model with multi-payer
+│   │   ├── settlement.dart                 # Settlement model
 │   │   └── app_settings.dart               # App settings model
 │   ├── services/
 │   │   ├── database_helper.dart            # SQLite database service
 │   │   ├── biometric_service.dart          # Biometric authentication
 │   │   ├── currency_service.dart           # Currency management
-│   │   └── export_import_service.dart      # Backup/restore functionality
+│   │   ├── export_service.dart             # PDF/Excel export service
+│   │   └── export_import_service.dart      # JSON backup/restore functionality
 │   ├── providers/
 │   │   ├── expense_provider.dart           # Expense state management
 │   │   └── settings_provider.dart          # Settings state management
@@ -198,9 +213,10 @@ group_xpense/
 │   │   ├── home_screen.dart                # Groups list with refresh
 │   │   ├── biometric_lock_screen.dart      # Biometric authentication screen
 │   │   ├── privacy_consent_screen.dart     # Privacy policy consent
+│   │   ├── privacy_policy_screen.dart      # Privacy policy display
 │   │   ├── create_group_screen.dart        # Create new group
 │   │   ├── edit_group_screen.dart          # Edit group & manage members
-│   │   ├── group_detail_screen.dart        # Expenses/Balances/Members tabs
+│   │   ├── group_detail_screen.dart        # 5 tabs: Expenses/Balances/Members/Settle/Reports
 │   │   ├── add_expense_multi_payer_screen.dart  # Multi-payer expense form
 │   │   ├── expense_detail_screen.dart      # View/Edit/Delete expense
 │   │   ├── reports_screen.dart             # Category & monthly reports
@@ -218,9 +234,15 @@ group_xpense/
 
 ## 💾 Database Schema
 
+### Database Information
+- **Database Name**: `group_xpense.db`
+- **Database Version**: 3
+- **Engine**: SQLite via sqflite
+- **Total Tables**: 6
+
 ### Tables
 
-**groups**
+**1. groups** - Main group container
 ```sql
 CREATE TABLE groups (
   id TEXT PRIMARY KEY,
@@ -230,7 +252,7 @@ CREATE TABLE groups (
 );
 ```
 
-**persons**
+**2. persons** - Group members/participants
 ```sql
 CREATE TABLE persons (
   id TEXT PRIMARY KEY,
@@ -242,7 +264,7 @@ CREATE TABLE persons (
 );
 ```
 
-**expenses**
+**3. expenses** - Main expense records
 ```sql
 CREATE TABLE expenses (
   id TEXT PRIMARY KEY,
@@ -254,11 +276,13 @@ CREATE TABLE expenses (
   category TEXT,
   notes TEXT,
   isSettlement INTEGER DEFAULT 0,
+  createdAt TEXT NOT NULL,
   FOREIGN KEY (groupId) REFERENCES groups (id) ON DELETE CASCADE
 );
 ```
+*Note: `paidById` stores the first payer for backward compatibility. Actual multi-payer data is in `expense_payers` table.*
 
-**expense_payers** (Multi-Payer Support)
+**4. expense_payers** - Multi-payer support (Many-to-Many)
 ```sql
 CREATE TABLE expense_payers (
   expenseId TEXT NOT NULL,
@@ -269,8 +293,9 @@ CREATE TABLE expense_payers (
   FOREIGN KEY (personId) REFERENCES persons (id) ON DELETE CASCADE
 );
 ```
+*Tracks which persons paid for an expense and how much each paid.*
 
-**expense_participants** (Many-to-Many)
+**5. expense_participants** - Expense participants (Many-to-Many)
 ```sql
 CREATE TABLE expense_participants (
   expenseId TEXT NOT NULL,
@@ -280,8 +305,9 @@ CREATE TABLE expense_participants (
   FOREIGN KEY (personId) REFERENCES persons (id) ON DELETE CASCADE
 );
 ```
+*Tracks who is included in splitting an expense.*
 
-**expense_splits**
+**6. expense_splits** - Custom split amounts per person
 ```sql
 CREATE TABLE expense_splits (
   expenseId TEXT NOT NULL,
@@ -292,6 +318,49 @@ CREATE TABLE expense_splits (
   FOREIGN KEY (personId) REFERENCES persons (id) ON DELETE CASCADE
 );
 ```
+*Stores the specific amount each participant owes for an expense.*
+
+### Database Indexes
+
+Performance optimization through strategic indexing:
+
+```sql
+CREATE INDEX idx_persons_groupId ON persons(groupId);
+CREATE INDEX idx_expenses_groupId ON expenses(groupId);
+CREATE INDEX idx_expenses_date ON expenses(date);
+CREATE INDEX idx_expenses_createdAt ON expenses(createdAt);
+```
+
+### Schema Migrations
+
+**Version 1 → 2:**
+- Added `notes` column to expenses
+- Added `isSettlement` column to expenses
+- Created `expense_payers` table for multi-payer support
+- Migrated existing single-payer expenses to multi-payer format
+
+**Version 2 → 3:**
+- Added `createdAt` column to expenses
+- Created index on `createdAt` for performance
+- Backfilled existing records with date as createdAt
+
+### Cascading Deletes
+
+The schema implements automatic cascading deletes:
+- Deleting a **group** automatically removes:
+  - All persons in that group
+  - All expenses in that group
+  - All related payer, participant, and split records
+
+- Deleting an **expense** automatically removes:
+  - All payer records
+  - All participant records
+  - All split records
+
+- Deleting a **person** automatically removes:
+  - All payer records for that person
+  - All participant records for that person
+  - All split records for that person
 
 ## 📱 How to Use
 
@@ -328,6 +397,7 @@ CREATE TABLE expense_splits (
 4. **Select Payers**:
    - Check one or more people who paid
    - Enter amount each person paid
+   - Use "Auto Split Remaining" to distribute remaining amounts
    - Use "Auto Split" for equal division
 5. **Select Participants**:
    - Choose who will share the expense
@@ -335,7 +405,15 @@ CREATE TABLE expense_splits (
 6. **Choose Split Type**:
    - **Equal**: Divided equally among participants
    - **Custom**: Set specific amounts
-7. Review summary and tap **"Add Expense"**
+7. Select category (Food & Drinks, Transport, etc.)
+8. Add notes and date (optional)
+9. Review summary and tap **"Add Expense"**
+
+### Deleting Expenses
+1. Open a group → View expense list
+2. Tap delete icon on expense card
+3. Confirm deletion
+   - Or tap expense for details → tap delete button
 
 ### Recording Settlements
 1. Open a group → Navigate to "Balances" tab
@@ -346,11 +424,18 @@ CREATE TABLE expense_splits (
 
 ### Viewing Reports
 1. Open a group
-2. Tap three-dot menu → "Reports"
+2. Navigate to "Reports" tab (5th tab in group detail)
+   - Or tap three-dot menu → "Reports"
 3. View:
-   - Category breakdown with charts
+   - Summary statistics (total, count, average)
+   - Category breakdown with charts and percentages
    - Monthly spending trends
-   - Detailed statistics
+   - Member statistics
+4. Export reports:
+   - Tap export icon → Choose PDF or Excel
+   - Reports saved to documents directory
+   - Option to share via any app
+   - Tap to open exported file
 
 ### Backup & Restore
 
@@ -365,10 +450,10 @@ CREATE TABLE expense_splits (
 #### Restoring from Backup
 1. Go to Settings → "Backup & Restore"
 2. Choose:
-   - **Browse**: Select file from device
-   - **Restore**: Pick from saved backups
+   - **Browse Device**: Select file from Downloads, Drive, etc.
+   - **View Saved Backups**: Pick from app's saved backups
 3. Preview backup details before importing
-4. Confirm import (duplicates are skipped)
+4. Confirm import (duplicates are automatically skipped)
 5. Groups refresh automatically
 
 #### Managing Backups
@@ -427,6 +512,11 @@ dependencies:
   path_provider: ^2.1.1         # File system access
   share_plus: ^7.2.1            # Share functionality
   file_picker: ^8.0.0+1         # File selection
+  pdf: ^3.10.7                  # PDF report generation
+  excel: ^4.0.2                 # Excel export
+  open_file: ^3.3.2             # Open exported files
+  image_picker: ^1.0.4          # Photo selection
+  permission_handler: ^11.0.1   # Permission management
 
 dev_dependencies:
   flutter_test:
@@ -476,11 +566,18 @@ Multi-Payer:
 
 ### Import/Export Algorithm
 ```dart
-Export:
+Export (JSON):
 1. Serialize group data to JSON
 2. Include version and timestamp
 3. Save to local file system
 4. Provide share options
+
+Export (PDF/Excel):
+1. Generate formatted report with statistics
+2. Include category breakdown and charts
+3. Add member details and summaries
+4. Save with timestamp to documents
+5. Option to open file directly
 
 Import:
 1. Validate JSON format and version
@@ -546,7 +643,16 @@ Import:
 **Problem**: Currency not updating
 **Solution**: Change currency in settings and restart app
 
-## 📈 Roadmap & Future Enhancements
+## 📈 Recent Updates & Roadmap
+
+### Recently Implemented ✅
+- ✅ Auto-split remaining amount feature
+- ✅ Quick delete expenses from list
+- ✅ PDF report generation with modern formatting
+- ✅ Auto expense calculation from payer info
+- ✅ Group and member rename functionality
+- ✅ Enhanced multi-payer expense screen
+- ✅ 5-tab group detail interface
 
 ### Planned Features
 - [ ] Cloud backup and sync (optional)
@@ -559,6 +665,7 @@ Import:
 - [ ] Expense categories customization
 - [ ] Backup encryption
 - [ ] Multi-language support
+- [ ] Expense receipt photo attachments
 
 ### Under Consideration
 - [ ] Web dashboard
@@ -614,19 +721,31 @@ final expense = Expense(
 await provider.addExpense(expense);
 ```
 
-### Exporting a Backup
+### Exporting Data
 ```dart
-// Export single group
+// Export single group as JSON
 final file = await ExportImportService.exportGroupToFile(
   groupId,
   groupName,
 );
 
-// Export all groups
+// Export all groups as JSON
 final file = await ExportImportService.exportAllGroupsToFile();
 
 // Share the backup
 await ExportImportService.shareAllGroupsFile();
+
+// Generate PDF report
+final pdfFile = await ExportService.exportGroupToPdf(
+  group,
+  expenses,
+);
+
+// Generate Excel report
+final excelFile = await ExportService.exportGroupToExcel(
+  group,
+  expenses,
+);
 ```
 
 ### Importing from Backup
@@ -695,13 +814,20 @@ Give a ⭐️ if this project helped you manage your group expenses better!
 - **Version**: 2.1.0
 - **Build**: 2
 - **Release Date**: January 2026
-- **Last Updated**: January 4, 2026
+- **Last Updated**: January 19, 2026
 - **Status**: ✅ Production Ready
 - **Platforms**: Android, iOS
 - **Language**: Dart/Flutter
-- **Lines of Code**: 5000+
-- **Database Version**: 2
+- **SDK Version**: 3.10.4+
+- **Database**: SQLite v3 with 6 tables
+- **Screens**: 13
+- **Models**: 5
+- **Services**: 5
+- **Providers**: 2
+- **Database Tables**: 6 (groups, persons, expenses, expense_payers, expense_participants, expense_splits)
+- **Database Indexes**: 4
 - **Supported Currencies**: 15+
+- **Export Formats**: JSON, PDF, Excel
 
 ---
 
